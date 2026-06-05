@@ -18,7 +18,7 @@
 
 local M = AutoRota:NewClassModule("WARLOCK")
 M.uiTitle = "Warlock"
-M.uiHeight = 470
+M.uiHeight = 500
 M.meleeAutoAttack = false   -- caster, no white melee swing
 
 local function msgOut(text, r, g, b)
@@ -85,6 +85,7 @@ function M:NormalizeProfile(c)
     if c.lifeTap == nil then c.lifeTap = false end
     if c.lifeTapMana == nil then c.lifeTapMana = 20 end
     if c.lifeTapHpMin == nil then c.lifeTapHpMin = 40 end
+    if c.nightfall == nil then c.nightfall = false end
     return c
 end
 
@@ -104,15 +105,35 @@ function M:ProfileValidity(cfg)
     if cfg.curse ~= "" and not self:KnowsSpell(cfg.curse)       then table.insert(missing, cfg.curse)      end
     if cfg.filler ~= "Shoot" and not self:KnowsSpell(cfg.filler) then table.insert(missing, cfg.filler)    end
     if cfg.lifeTap and not self:KnowsSpell("Life Tap")          then table.insert(missing, "Life Tap")     end
+    if cfg.nightfall and not self:KnowsSpell("Shadow Bolt")     then table.insert(missing, "Shadow Bolt")  end
     return (table.getn(missing) == 0), missing
 end
 
--- Queue a known spell, preferring SuperWoW's cast queue so a cast in
--- progress is not clipped. Returns true if the spell is known.
+-- Queue a known spell. Normally this uses SuperWoW's cast queue so a
+-- cast in progress is not clipped. While the wand is auto-repeating,
+-- though, a queued cast would have to wait for the current shot (up to
+-- the full wand speed), which shows up as a pause after a target switch.
+-- In that case cast directly, which interrupts the wand and fires now.
 function M:Queue(name)
     if not self:KnowsSpell(name) then return false end
-    if QueueSpellByName then QueueSpellByName(name) else CastSpellByName(name) end
+    local wanding = false
+    for s = 1, 120 do if IsAutoRepeatAction(s) then wanding = true; break end end
+    if wanding or not QueueSpellByName then
+        CastSpellByName(name)
+    else
+        QueueSpellByName(name)
+    end
     return true
+end
+
+-- True while the Nightfall proc (Shadow Trance) is on the warlock.
+function M:ShadowTranceUp()
+    if self:HasBuff("Shadow Trance") then return true end
+    for i = 1, 32 do
+        local b = UnitBuff("player", i)
+        if b and string.find(b, "Spell_Shadow_Twilight") then return true end
+    end
+    return false
 end
 
 function M:TargetHasTexture(frag)
@@ -158,6 +179,13 @@ end
 -- ============================================================
 function M:Rotate(cfg)
     if cfg.petAttack and UnitExists("pet") then PetAttack() end
+
+    -- Nightfall reaction: when a filler other than Shadow Bolt is chosen,
+    -- spend the free instant Shadow Bolt as soon as Shadow Trance is up.
+    if cfg.nightfall and cfg.filler ~= "Shadow Bolt" and self:KnowsSpell("Shadow Bolt") and self:ShadowTranceUp() then
+        self:Queue("Shadow Bolt")
+        return
+    end
 
     -- Build the ordered DoT list from the enabled, known effects.
     local order = {}
@@ -221,4 +249,4 @@ function M:HandleCommand(cmd, t)
         return true
     end
     return false
-end
+endq
