@@ -1,8 +1,6 @@
-# AutoRota (v0.4)
+# AutoRota (v0.5b)
 
 AutoRota is a lightweight, robust, Configurable one-button rotation, multi class (Turtle WoW 1.12 / SuperWoW). Unlike standard "monolithic" 1.12 macros or basic script loops, AutoRota uses a modern modular architecture, automated frame-by-frame management, and smart situational logic to execute combat rotations.
-
-Version 0.4 introduces a complete graphical configuration panel and database system, moving configuration options out of your macros and into a clean visual window.
 
 ---
 
@@ -31,6 +29,16 @@ A refined evolution of the *ExAutoRogue* logic focused on efficient combo point 
 - **Finisher Hysteresis Engine:** Dynamically tracks *Slice and Dice* and *Envenom* buffs. It will auto-refresh them efficiently at exactly 1 Combo Point if they are about to expire, otherwise saving points to dump into maximum-damage *Eviscerates*.
 - **Reactionary Counters:** Instantaneous out-of-GCD execution for abilities like *Riposte* during active parry windows.
 - **Cooldown Automation:** Integrates *Adrenaline Rush* and *Blade Flurry* seamlessly, prioritizing them against Elite or Boss targets.
+
+### ⚔️ Warrior `(Beta)`
+A roleless, toggle-driven engine covering Arms, Fury, and Protection from early leveling through endgame raiding. Rather than locking to a spec, you enable the abilities you have and the priority degrades gracefully as you learn them:
+- **All-Spec Roleless Design:** One profile schema serves every spec via simple toggles. Abilities you have not learned yet are skipped automatically and flagged as *(not learned)* in the panel, so the same setup keeps working as you level.
+- **Stance & Rage Aware Casting:** A warrior-specific gate verifies rage, stance, and cooldown *before* committing to a cast, so a stance- or rage-locked ability can never stall the priority chain. Stance rules follow vanilla 1.12 and stay conservative if Turtle relaxes them.
+- **Reactive Proc Windows:** Reads the combat log for target dodges and your own block/dodge/parry to open short windows for *Overpower* (Battle Stance) and *Revenge* (Defensive Stance), mirroring the Rogue's Riposte tracker.
+- **Optional Stance Dancing:** An experimental opt-in that auto-swaps to Battle Stance for *Overpower*, then drifts back to your configured home stance, throttled by a swap cooldown to prevent thrashing.
+- **Smart Rage Dump:** Queues *Heroic Strike* (or *Cleave* in AoE mode) onto your next swing only above a configurable rage floor, and suppresses it during the *Execute* phase so surplus rage funnels into *Execute*.
+- **Cooldown Automation:** *Death Wish*, *Recklessness*, and *Berserker Rage* fire on cooldown, only on Elite/Boss targets, or fully manually — the same three-state model as the other classes — while *Bloodrage* tops up rage on demand, even before the pull.
+- **Threat Toolkit:** Maintains *Sunder Armor* up to a chosen stack count and weaves *Shield Slam*, *Revenge*, and *Shield Block* upkeep for Protection tanking.
 
 ### 🔮 Warlock 
 
@@ -94,6 +102,10 @@ You can also change profile properties dynamically via chat or macros:
 | `/ar trace` | Toggles detailed combat logic debugging. | `/ar trace` |
 | `/ar cp <1-5>` | *(Rogue Only)* Sets min. finishing Combo Points. | `/ar cp 5` |
 | `/ar seal <slot> debuff/damage <alias>` | *(Paladin Only)* Modifies profile seals. | `/ar seal DPS damage sor` |
+| `/ar aoe` | *(Warrior Only)* Toggles AoE mode (Cleave + Whirlwind). | `/ar aoe` |
+| `/ar cd <on/elite/off>` | *(Warrior Only)* Sets cooldown usage mode. | `/ar cd elite` |
+| `/ar dance` | *(Warrior Only)* Toggles experimental stance dancing. | `/ar dance` |
+| `/ar spell <alias> <on/off>` | *(Warrior Only)* Flips an ability on the active profile. | `/ar spell ms on` |
 
 Paladin Seal Aliases
 When using the /ar seal command, you can use short aliases:
@@ -112,6 +124,31 @@ You can maintain a single spammable combat macro while using separate keybinds t
 `/ar seal <profile> debuff <alias>` : Updates your current rotation debuff mid-fight.
 
 `/ar seal <profile> damage <alias>` : Updates your current rotation damage seal mid-fight.
+
+Warrior Combat Toggles:
+
+The Warrior module adds quick toggles you can bind to separate keys to adjust the rotation mid-fight without opening the panel:
+
+`/ar aoe` : Toggles AoE mode (rage dump becomes *Cleave*, *Whirlwind* used on cooldown).
+
+`/ar cd on|elite|off` : Sets cooldown usage to always, Elite/Boss only, or fully manual.
+
+`/ar dance` : Toggles experimental stance dancing for *Overpower*.
+
+`/ar spell <alias> on|off` : Flips an individual ability on the active profile (e.g., `/ar spell bt off`).
+
+Warrior Spell Aliases
+When using the /ar spell command, you can use short aliases:
+
+  * `ms` / `mortalstrike` → `Mortal Strike`
+  * `bt` / `bloodthirst` → `Bloodthirst`
+  * `ss` / `shieldslam` → `Shield Slam`
+  * `ww` / `whirlwind` → `Whirlwind`, `slam` → `Slam`
+  * `op` / `overpower` → `Overpower`, `rev` / `revenge` → `Revenge`, `exec` / `execute` → `Execute`
+  * `sa` / `sunder` → `Sunder Armor`, `tc` / `thunderclap` → `Thunder Clap`
+  * `hs` / `heroicstrike` → `Heroic Strike`, `cleave` → `Cleave`, `sweep` / `sweeping` → `Sweeping Strikes`
+  * `dw` / `deathwish` → `Death Wish`, `reck` / `recklessness` → `Recklessness`, `br` / `berserkerrage` → `Berserker Rage`
+  * `bld` / `bloodrage` → `Bloodrage`, `sb` / `shieldblock` → `Shield Block`
 
 ---
 
