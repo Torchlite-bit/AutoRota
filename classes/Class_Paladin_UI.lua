@@ -37,40 +37,44 @@ function M:BuildBody(ui, f)
     self.spellCB.holyShield     = ui:CreateCheck("holyShield",     f, "Holy Shield",     "Holy Shield",     function(v) if ui.buf then ui.buf.spells.holyShield = v; ui:Refresh() end end)
     self.spellCB.hammerOfWrath  = ui:CreateCheck("hammerOfWrath",  f, "Hammer of Wrath", "Hammer of Wrath", function(v) if ui.buf then ui.buf.spells.hammerOfWrath = v; ui:Refresh() end end)
     self.spellCB.repentance     = ui:CreateCheck("repentance",     f, "Repentance",      "Repentance",      function(v) if ui.buf then ui.buf.spells.repentance = v; ui:Refresh() end end)
+    self.spellCB.consecration   = ui:CreateCheck("consecration",   f, "Consecration (AoE)", "Consecration",  function(v) if ui.buf then ui.buf.spells.consecration = v; ui:Refresh() end end)
+    self.spellCB.exorcism       = ui:CreateCheck("exorcism",       f, "Exorcism",        "Exorcism",        function(v) if ui.buf then ui.buf.spells.exorcism = v; ui:Refresh() end end)
     self.spellCB.holyStrike.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -240)
     self.spellCB.crusaderStrike.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -240)
     self.spellCB.holyShield.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -262)
     self.spellCB.hammerOfWrath.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -262)
     self.spellCB.repentance.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -284)
+    self.spellCB.consecration.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -306)
+    self.spellCB.exorcism.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -306)
 
     self.twistCB = ui:CreateCheck("sealTwist", f, "Seal twisting", nil, function(v) if ui.buf then ui.buf.sealTwist = v; ui:Refresh() end end)
     self.twistCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -284)
 
     self.manaCB = ui:CreateCheck("manaManage", f, "Mana management (Seal of Wisdom)", "Seal of Wisdom", function(v) if ui.buf then ui.buf.manaManage = v; ui:Refresh() end end)
-    self.manaCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -314)
+    self.manaCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -342)
     self.manaLowSlider  = ui:CreateSlider("manaLow",  f, "switch below", function(v) if ui.buf then ui.buf.manaLow  = v; ui:Refresh() end end)
     self.manaHighSlider = ui:CreateSlider("manaHigh", f, "back above",   function(v) if ui.buf then ui.buf.manaHigh = v; ui:Refresh() end end)
-    self.manaLowSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -356)
-    self.manaHighSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -356)
+    self.manaLowSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -384)
+    self.manaHighSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -384)
     self.weaveCB = ui:CreateCheck("manaWeave", f, "Judgement weaving", nil, function(v) if ui.buf then ui.buf.manaWeave = v; ui:Refresh() end end)
-    self.weaveCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 40, -388)
+    self.weaveCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 40, -416)
     self.weaveMinSlider = ui:CreateSlider("manaWeaveMin", f, "skip weaving below", function(v) if ui.buf then ui.buf.manaWeaveMin = v; ui:Refresh() end end)
-    self.weaveMinSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 46, -426)
+    self.weaveMinSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 46, -454)
     self.wisdomCB = ui:CreateCheck("manaWisdomDebuff", f, "Use Wisdom debuff in mana mode", nil, function(v) if ui.buf then ui.buf.manaWisdomDebuff = v; ui:Refresh() end end)
-    self.wisdomCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 40, -456)
+    self.wisdomCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 40, -484)
 
     self.hpCB = ui:CreateCheck("hpManage", f, "HP management (Seal of Light)", "Seal of Light", function(v) if ui.buf then ui.buf.hpManage = v; ui:Refresh() end end)
-    self.hpCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -490)
+    self.hpCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -518)
     self.hpLowSlider  = ui:CreateSlider("hpLow",  f, "switch below", function(v) if ui.buf then ui.buf.hpLow  = v; ui:Refresh() end end)
     self.hpHighSlider = ui:CreateSlider("hpHigh", f, "back above",   function(v) if ui.buf then ui.buf.hpHigh = v; ui:Refresh() end end)
-    self.hpLowSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -532)
-    self.hpHighSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -532)
+    self.hpLowSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -560)
+    self.hpHighSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -560)
 
     -- section separators for easier scanning
     ui:Divider(f, -134)   -- above Seals
     ui:Divider(f, -214)   -- above Spells
-    ui:Divider(f, -306)   -- above Mana management
-    ui:Divider(f, -480)   -- above HP management, below the Wisdom debuff toggle
+    ui:Divider(f, -334)   -- above Mana management
+    ui:Divider(f, -508)   -- above HP management, below the Wisdom debuff toggle
 
 
     ui:Tip(self.debuffDD, "Debuff seal", "Judged once to apply its debuff to the target.", "Autoattacks keep the debuff up afterwards.")
@@ -81,6 +85,8 @@ function M:BuildBody(ui, f)
     ui:Tip(self.spellCB.holyShield.cb,     "Holy Shield",     "Cast right after the strike, before seals.", "Fires whenever its own cooldown is ready.")
     ui:Tip(self.spellCB.hammerOfWrath.cb,  "Hammer of Wrath", "Execute, used only at or below 20 percent target HP.")
     ui:Tip(self.spellCB.repentance.cb,     "Repentance",      "Cast on cooldown as a damage proc on Turtle.")
+    ui:Tip(self.spellCB.consecration.cb,   "Consecration",    "AoE filler, cast on cooldown. Manual toggle (also /ar aoe), since 1.12 cannot count nearby enemies.", "Held during mana recovery.")
+    ui:Tip(self.spellCB.exorcism.cb,       "Exorcism",        "Strong nuke, used on cooldown but only against Undead and Demon targets.", "Held during mana recovery.")
 
     ui:Tip(self.manaCB.cb, "Mana management", "Below the lower value, hold Seal of Wisdom to recover mana.", "Above the upper value, return to normal damage seals.")
     ui:Tip(self.hpCB.cb, "HP management", "Below the lower value, hold Seal of Light to recover health.", "Above the upper value, return to normal damage seals.")
@@ -118,6 +124,7 @@ function M:RefreshBody(ui, buf)
         else item.label:SetText(item.baseText); ui:Color(item.label, ui.COL.white) end
     end
     setCB("holyStrike"); setCB("crusaderStrike"); setCB("holyShield"); setCB("hammerOfWrath"); setCB("repentance")
+    setCB("consecration"); setCB("exorcism")
 
     -- seal twisting needs a damage seal to time the judge against
     local twistOK = buf.seals.damage ~= "" and self:KnowsSpell(buf.seals.damage)
