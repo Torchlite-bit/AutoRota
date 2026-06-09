@@ -25,6 +25,8 @@ Engineered around an intelligent "Roleless Seal Model" optimized for low-level l
 - **Hysteresis Resource Management:** Fully configurable independent health and mana safety floors. When triggered, the engine swaps to *Seal of Light* or *Seal of Wisdom* until your resource stabilizes back to your high threshold.
 - **Seal Twisting Support:** If enabled, delays damage judgements until precisely `< 0.4s` before your next white swing to combine weapon procs and judgements simultaneously.
 - **Strike Priority Sync:** Coordinates *Holy Strike* and *Crusader Strike* cooldowns to intelligently maintain *Holy Might* and stack *Zeal* dynamically.
+- **Consecration (opt-in):** An AoE filler cast on cooldown when enabled. Because the 1.12 client cannot reliably count nearby enemies, it is a manual toggle — the *Consecration (AoE)* checkbox, or `/ar aoe` for a quick keybind flip. It sits last in the priority so it never delays your strikes, *Holy Shield*, seal/Judgement upkeep, or *Hammer of Wrath*, and is held during mana recovery.
+- **Exorcism (opt-in):** Cast on cooldown, but only against *Undead* and *Demon* targets (checked via creature type), and likewise paused while recovering mana.
 
 ### 🥷 Rogue 
 A refined evolution of the *ExAutoRogue* logic focused on efficient combo point generation and finishing priority:
