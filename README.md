@@ -108,10 +108,10 @@ You can also change profile properties dynamically via chat or macros:
 | `/armap` | Hides or shows the minimap button. | `/armap` |
 | `/ar cp <1-5>` | *(Rogue Only)* Sets min. finishing Combo Points. | `/ar cp 5` |
 | `/ar seal <slot> debuff/damage <alias>` | *(Paladin Only)* Modifies profile seals. | `/ar seal DPS damage sor` |
-| `/ar aoe` | *(Warrior & Paladin Only)* Toggles AoE mode (Cleave + Whirlwind). | `/ar aoe` |
+| `/ar aoe` | *(Warrior & Paladin Only)* Toggles AoE mode (Cleave + Whirlwind / Consecration). | `/ar aoe` |
 | `/ar cd <on/elite/off>` | *(Warrior Only)* Sets cooldown usage mode. | `/ar cd elite` |
 | `/ar dance` | *(Warrior Only)* Toggles experimental stance dancing. | `/ar dance` |
-| `/ar spell <alias> <on/off>` | *(Warrior Only)* Flips an ability on the active profile. | `/ar spell ms on` |
+| `/ar spell <alias> <on/off>` | *(Warrior Only & Paladin)* Flips an ability on the active profile. | `/ar spell ms on` |
 
 ### Paladin Seal Aliases
 When using the /ar seal command, you can use short aliases:
