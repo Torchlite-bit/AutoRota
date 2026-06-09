@@ -6,8 +6,8 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ## v0.5b — Warrior Beta
 
-The headline of this release is a brand new **Warrior** combat module, plus the
-supporting commands and documentation. Paladin and Rogue behaviour is unchanged.
+The headline of this release is a brand new **Warrior** combat module, plus a
+minimap button and a couple of **Paladin** additions. Rogue behaviour is unchanged.
 
 ### ⚔️ New: Warrior Module `(Beta)`
 A roleless, toggle-driven engine covering **Arms, Fury, and Protection** from early
@@ -23,6 +23,11 @@ degrades gracefully as you learn the rest.
 - **Threat Toolkit:** Maintains *Sunder Armor* up to a chosen stack count and weaves *Shield Slam*, *Revenge*, and *Shield Block* upkeep for Protection tanking.
 - **Starter Templates:** Ships with `starter`, `fury`, `arms`, and `prot` presets. Create one with `/ar new <name> <template>`.
 
+### 🛡️ Paladin Updates
+- **Consecration (opt-in):** New AoE filler, cast on cooldown when enabled. Because the 1.12 client cannot reliably count nearby enemies, it is a manual toggle — the *Consecration (AoE)* checkbox, or `/ar aoe` for a quick keybind flip. It sits last in the priority so it never delays strikes, *Holy Shield*, seal/Judgement upkeep, or the execute, and it is held during mana recovery.
+- **Exorcism (opt-in):** New on-cooldown nuke, used only against *Undead* and *Demon* targets (checked via creature type). Also held during mana recovery.
+- Both default to off, are flagged *(not learned)* in the panel until trained, and gain `/ar spell` aliases (`consec` / `cons`, `exo`). `/ar aoe` now works for Paladins too, toggling Consecration.
+
 ### ✨ Added
 - **Minimap Button:** A draggable minimap button (`AutoRota_Minimap.lua`) that wears your character's class crest (paladin, rogue, warrior, etc., with a cog fallback). Left-click opens the configuration panel, right-click runs the rotation once, and dragging moves it around the minimap edge. Its position is saved per character; toggle visibility with **`/armap`**.
 - **`/ar aoe`** *(Warrior)* — toggles AoE mode (rage dump becomes *Cleave*, *Whirlwind* used on cooldown). Bindable for mid-fight flips.
@@ -32,7 +37,8 @@ degrades gracefully as you learn the rest.
 
 ### 🔧 Changed
 - **`.toc`** now loads `AutoRota_Minimap.lua` plus `classes\Class_Warrior.lua` and `classes\Class_Warrior_UI.lua`, and the addon version is bumped to **0.5b**.
-- **README** updated with the Warrior section, the new commands in the CLI table, and a Warrior toggles / spell-alias reference.
+- **README** updated with the Warrior section, the Paladin Consecration/Exorcism notes, the new commands in the CLI table, and the toggle / spell-alias references.
+- The **Paladin config window** grew slightly to fit the two new ability checkboxes (mana/HP sections shifted down to match).
 
 ### 📝 Notes & Known Limitations
 - **AoE is a manual toggle.** SuperWoW exposes no reliable "enemies in range" count on the 1.12 client, so AoE mode is flipped by you (`/ar aoe` or the checkbox) rather than auto-detected.
