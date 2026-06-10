@@ -1,4 +1,4 @@
-# AutoRota (v0.5b)
+# AutoRota (v0.5.2b)
 
 AutoRota is a lightweight, robust, Configurable one-button rotation, multi class (Turtle WoW 1.12 / SuperWoW). Unlike standard "monolithic" 1.12 macros or basic script loops, AutoRota uses a modern modular architecture, automated frame-by-frame management, and smart situational logic to execute combat rotations.
 
@@ -24,7 +24,8 @@ Engineered around an intelligent "Roleless Seal Model" optimized for low-level l
 - **Low-Level Safety Guard:** Built-in safeguards automatically bypass the Judgement/Debuff loop if your Paladin is under level 10 and hasn't learned `Judgement` yet, keeping your damage seal active as a permanent auto-attack buff.
 - **Hysteresis Resource Management:** Fully configurable independent health and mana safety floors. When triggered, the engine swaps to *Seal of Light* or *Seal of Wisdom* until your resource stabilizes back to your high threshold.
 - **Seal Twisting Support:** If enabled, delays damage judgements until precisely `< 0.4s` before your next white swing to combine weapon procs and judgements simultaneously.
-- **Strike Priority Sync:** Coordinates *Holy Strike* and *Crusader Strike* cooldowns to intelligently maintain *Holy Might* and stack *Zeal* dynamically.
+- **Talent & Weapon Aware Strikes:** A single *Strike mode* picks how *Holy Strike* and *Crusader Strike* are used — `Off`, `Auto (talent/weapon)`, `Crusader Strike`, `Holy Strike`, or `Holy then Crusader`. **Auto** reads your spec and gear: *Holy Might* is maintained only if you have *Vengeful Strike*, and the Holy-vs-Crusader lean follows *Righteous Strike* or a shield/offhand (threat lean) versus a two-hander (Crusader lean), adjusting live as you swap weapons. *Zeal* is built and kept rolling in every mode.
+- **Mana Downranking (opt-in):** *Downrank when low* casts lower ranks of your strikes as raw mana drops, to keep swinging while leveling. Thresholds use absolute mana (not percent), so a full pool stays at top rank and only a near-empty pool steps down, always clamped to your highest known rank.
 - **Consecration (opt-in):** An AoE filler cast on cooldown when enabled. Because the 1.12 client cannot reliably count nearby enemies, it is a manual toggle — the *Consecration (AoE)* checkbox, or `/ar aoe` for a quick keybind flip. It sits last in the priority so it never delays your strikes, *Holy Shield*, seal/Judgement upkeep, or *Hammer of Wrath*, and is held during mana recovery.
 - **Exorcism (opt-in):** Cast on cooldown, but only against *Undead* and *Demon* targets (checked via creature type), and likewise paused while recovering mana.
 
@@ -108,6 +109,7 @@ You can also change profile properties dynamically via chat or macros:
 | `/armap` | Hides or shows the minimap button. | `/armap` |
 | `/ar cp <1-5>` | *(Rogue Only)* Sets min. finishing Combo Points. | `/ar cp 5` |
 | `/ar seal <slot> debuff/damage <alias>` | *(Paladin Only)* Modifies profile seals. | `/ar seal DPS damage sor` |
+| `/ar strike <mode>` | *(Paladin Only)* Sets strike mode (`off`/`auto`/`cs`/`hs`/`hscs`). | `/ar strike hs` |
 | `/ar aoe` | *(Warrior & Paladin Only)* Toggles AoE mode (Cleave + Whirlwind / Consecration). | `/ar aoe` |
 | `/ar cd <on/elite/off>` | *(Warrior Only)* Sets cooldown usage mode. | `/ar cd elite` |
 | `/ar dance` | *(Warrior Only)* Toggles experimental stance dancing. | `/ar dance` |
@@ -132,6 +134,8 @@ You can maintain a single spammable combat macro while using separate keybinds t
   * `/ar seal <profile> debuff <alias>` : Updates your current rotation debuff mid-fight.
 
   * `/ar seal <profile> damage <alias>` : Updates your current rotation damage seal mid-fight.
+
+  * `/ar strike <mode>` : Switches strike mode on the active profile mid-fight — `off`, `auto`, `cs`, `hs`, or `hscs` (Holy then Crusader). Handy for binding a tank/leveling style to a key.
 
 ## Warrior Combat Toggles:
 
