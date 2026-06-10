@@ -89,6 +89,11 @@ Because all configuration logic is handled by the visual interface and database,
 /ar
 ```
 
+> #### 🗡️ MELEE CLASSES: Put **Attack** on an action bar
+> For melee classes (Paladin, Rogue, Warrior), AutoRota keeps your white swing going by toggling the standard **Attack** ability — but it can only do this if that ability is on one of your action bars. Open your spellbook (**P**), find **Attack** in the *General* tab, and drag it onto any free action slot. Without it, the rotation will fire abilities but you may notice you are not auto-attacking between them.
+>
+> *Exception:* if you run **SuperCleveRoidMacros**, AutoRota leaves auto-attack handling to SCRM and skips this step.
+
 ## 🔨 Configuration & Settings
 To open the comprehensive configuration interface, manage profiles, adjust resource sliders, or toggle specific spells on or off, type:
 ```macro
@@ -169,3 +174,6 @@ MacroErrorChecker / UI Warning Messages
 If you use macro validation addons like MacroErrorChecker, you may see a warning in chat on login stating: L3: Unknown command: /ar.
 
 This is a false positive. External macro checkers look for a static list of default Blizzard interface commands. They cannot scan third-party custom slash engines. As long as typing /ar ui opens your addon profile window, AutoRota is working perfectly and you can safely ignore or disable the validation warning. This can be added to the whitelist with some addons like `SuperCleveRoidMacros` to avoid the chat error.
+
+### My character casts abilities but doesn't auto-attack
+On a melee class, AutoRota starts your white swing by toggling the standard **Attack** ability, which it locates by scanning your action bars. If **Attack** is not on any bar, there is nothing for it to toggle and you will fire abilities without swinging in between. Drag **Attack** from your spellbook (**P** → *General* tab) onto any action slot. (If you use **SuperCleveRoidMacros**, it manages attacks instead and AutoRota leaves this alone.)qqqq
