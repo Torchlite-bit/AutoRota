@@ -4,6 +4,31 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.5.3b — Core Optimization Pass
+
+A performance and cleanup release. No rotation behaviour changes — every class
+should play exactly as before, just cheaper per press. All changes are in the
+shared core and UI framework, so every class benefits at once.
+
+### ⚡ Performance
+- **Spellbook index:** spell lookups (`KnowsSpell`, `Cast`, `IsReady`, cooldown checks, max-rank queries) now read a cached name→slot / name→rank index instead of scanning the entire spellbook every call. A single rotation press used to trigger a dozen-plus full spellbook scans; each lookup is now a table read. **Fixed alongside it:** the index was never being invalidated — `SPELLS_CHANGED` is now wired up, so learning a spell or a new rank refreshes the cache immediately instead of requiring a `/reload`.
+- **Profile validity is cached**, not recomputed on every press. The cache clears when you learn a spell, switch or save a profile, or run any class slash command that can modify the active profile (`/ar seal`, `/ar strike`, ...). The throttled "profile incomplete" warning still appears — it just reads the cached result.
+- **Attack-button slot is cached.** Keeping auto-attack up used to scan all 172 action slots every press; it now verifies the remembered slot with a single call and only rescans if the button was moved or removed.
+- **Per-press buff snapshot.** Player buffs are scanned once per rotation press; every buff check inside that press (seals, *Zeal*, *Holy Might*, *Slice and Dice*, ...) reads the snapshot instead of rescanning all 32 buff slots. Outside the rotation (UI refresh, slash commands) the old full scan still runs, so nothing else changes.
+- **Paladin downranking** now reads max ranks from the shared index instead of its own per-cast spellbook scan.
+
+### 🔧 Cleanup
+- **Shared chat printer:** `AutoRota:Msg()` lives in the core; the identical local copies in the Paladin, Rogue, and Warrior modules are now one-line shims.
+- **Shared checkbox binder:** the "set checked + grey/red *(not learned)* label" routine each class UI re-implemented is now a single `AutoRotaUI:BindCheck()` in the framework, used by all three class panels.
+- **Multi-line trace:** the core `Trace` accepts several lines under one throttle check, so multi-line traces are never half-swallowed. The Paladin's hand-rolled double-print from 0.5.2b is gone; its two trace lines now go through the shared path.
+- **Login banner version** finally bumped — it had been reading 0.4 since the multi-class rewrite.
+
+### 🔮 Warlock Module Included
+- The **Warlock module ships in this release** (`Class_Warlock.lua` / `Class_Warlock_UI.lua`), restoring the class the `.toc` and README already referenced. DoT-priority rotation: *Immolate* → chosen Curse → *Corruption* → *Siphon Life*, detected by target debuff texture with a per-target landing memory so cast-time DoTs are never double-queued; then optional *Life Tap* (mana-low / health-high thresholds) and a configurable filler (wand, *Shadow Bolt*, or *Drain Life*). Optional pet send, and a *Nightfall* reaction that spends the free instant *Shadow Bolt* when *Shadow Trance* procs. Cast-time spells go through SuperWoW's `QueueSpellByName` so the rotation never clips a cast — except while wanding, where a direct cast fires immediately instead of waiting out the wand shot. `/ar curse <alias>` switches the curse on the active profile mid-fight.
+- The module was brought up to this release's standards on arrival: shared chat printer, shared checkbox binder, and a **cached wand slot** — the wand check used to scan up to 120 action slots as many as twice per press; while wanding it is now a single call, matching the attack-button caching above.
+
+---
+
 ## v0.5.2b — Paladin Strike Overhaul
 
 A focused pass on the **Paladin** strike engine (*Holy Strike* / *Crusader Strike*),
