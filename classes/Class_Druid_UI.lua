@@ -134,7 +134,7 @@ end
 -- Open the shared window for this class.
 M.OpenConfig = function(mod)
     if not AutoRotaUI then
-        AutoRota:Throttle("UI not ready yet, try again in a moment.")
+        AutoRota:Throttle("UI framework not loaded. AutoRota_UI.lua is missing or mislabeled in your AutoRota folder, reinstall the files.")
         return
     end
     AutoRotaUI:Toggle()
