@@ -31,7 +31,7 @@
 
 local M = AutoRota:NewClassModule("DRUID")
 M.uiTitle = "Druid"
-M.uiHeight = 706
+M.uiHeight = 768
 
 -- Chat output is shared in the core; this shim keeps call sites unchanged.
 local function msgOut(text, r, g, b) AutoRota:Msg(text, r, g, b) end
@@ -109,6 +109,9 @@ function M:NormalizeProfile(c)
     if c.useMaul == nil then c.useMaul = true end
     if c.aoeSwipe == nil then c.aoeSwipe = false end
     if c.useEnrage == nil then c.useEnrage = false end
+    if c.hpManage == nil then c.hpManage = false end
+    if c.hpLow == nil then c.hpLow = 35 end
+    if c.hpHigh == nil then c.hpHigh = 70 end
     if c.useMoonfire == nil then c.useMoonfire = true end
     if c.useInsectSwarm == nil then c.useInsectSwarm = true end
     if c.eclipse == nil then c.eclipse = true end
@@ -314,6 +317,7 @@ function M:RotateBear(cfg)
 
     if self.trace then
         self:Trace("bear rage=" .. rage
+            .. " def=" .. (self.hpDefenseActive and "Y" or "N")
             .. " FF=" .. (cfg.ffBear and (self:DebuffUp("Faerie Fire (Feral)") and "Y" or "n") or "-")
             .. " demo=" .. (cfg.useDemo and (self:DebuffUp("Demoralizing Roar") and "Y" or "n") or "-")
             .. " aoe=" .. (cfg.aoeSwipe and "Y" or "N")
@@ -389,6 +393,27 @@ function M:RotateCaster(cfg)
 end
 
 -- ============================================================
+-- Defensive form switch (hysteresis, like the paladin's resource
+-- management): below hpLow force Bear and stay there, at/above hpHigh
+-- release back to the preferred form. Inert until a bear form is known.
+-- ============================================================
+function M:BearFormSpell()
+    if self:KnowsSpell("Dire Bear Form") then return "Dire Bear Form" end
+    if self:KnowsSpell("Bear Form") then return "Bear Form" end
+    return nil
+end
+
+function M:UpdateDefense(cfg)
+    if cfg.hpManage and self:BearFormSpell() then
+        local hp = self:PlayerHPPct()
+        if hp < (cfg.hpLow or 35) then self.hpDefenseActive = true end
+        if hp >= (cfg.hpHigh or 70) then self.hpDefenseActive = false end
+    else
+        self.hpDefenseActive = false
+    end
+end
+
+-- ============================================================
 -- Rotation entry: follow the form you are in. Cat and Bear run their
 -- rotations, Moonkin runs Balance. From plain caster form: a "caster"
 -- preference enters Moonkin (when learned) and runs Balance; a cat/bear
@@ -397,10 +422,30 @@ end
 -- carries the character until the form appears.
 -- ============================================================
 function M:Rotate(cfg)
+    self:UpdateDefense(cfg)
     local form = self:CurrentForm()
+    local inBear = (form == "Bear Form" or form == "Dire Bear Form")
+
+    -- Defensive override: force Bear while HP is recovering. Form-to-form
+    -- shifts are direct in 1.12 (one cast), so Cat/Moonkin go straight in.
+    if self.hpDefenseActive then
+        if not inBear then
+            local b = self:BearFormSpell()
+            if self.trace then self:Trace("DEFENSE: hp " .. string.format("%.0f", self:PlayerHPPct()) .. "%, shifting to " .. b) end
+            self:CastSafe(b)
+            return
+        end
+        -- turtled up: Frenzied Regeneration converts rage to health
+        if self:KnowsSpell("Frenzied Regeneration") and self:OwnCDReady("Frenzied Regeneration") then
+            if self:CastSafe("Frenzied Regeneration") then return end
+        end
+        self:RotateBear(cfg)
+        return
+    end
+
     if form == "Cat Form" then
         self:RotateCat(cfg)
-    elseif form == "Bear Form" or form == "Dire Bear Form" then
+    elseif inBear then
         self:RotateBear(cfg)
     elseif form == "Moonkin Form" then
         self:RotateCaster(cfg)

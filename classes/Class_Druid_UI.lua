@@ -62,10 +62,20 @@ function M:BuildBody(ui, f)
     self.eclipseCB = ui:CreateCheck("eclipse", f, "React to Eclipse procs", nil, function(on) if ui.buf then ui.buf.eclipse = on; ui:Refresh() end end)
     self.eclipseCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -580)
 
+    -- Defense (HP management)
+    ui:FS(f, "GameFontNormal", "Defense (HP management)"):SetPoint("TOPLEFT", f, "TOPLEFT", 20, -616)
+    self.hpCB = ui:CreateCheck("hpManage", f, "Bear Form when HP is low", nil, function(on) if ui.buf then ui.buf.hpManage = on; ui:Refresh() end end)
+    self.hpCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -640)
+    self.hpLowSlider  = ui:CreateSlider("hpLow",  f, "switch below", function(v) if ui.buf then ui.buf.hpLow  = v; ui:Refresh() end end)
+    self.hpHighSlider = ui:CreateSlider("hpHigh", f, "back above",   function(v) if ui.buf then ui.buf.hpHigh = v; ui:Refresh() end end)
+    self.hpLowSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -684)
+    self.hpHighSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -684)
+
     ui:Divider(f, -134)   -- above Form
     ui:Divider(f, -194)   -- above Cat
     ui:Divider(f, -388)   -- above Bear
     ui:Divider(f, -496)   -- above Balance
+    ui:Divider(f, -608)   -- above Defense
 
     ui:Tip(self.formDD, "Preferred form", "Entered when you press the macro in caster form. Caster/Moonkin runs the Balance rotation (and enters Moonkin when learned).", "Before any form is learned, the caster rotation runs automatically, so this works from level 1.")
     ui:Tip(self.styleDD, "Cat style", "Claw & Bleed keeps Rake and Rip rolling (pairs with bleed-energy talents). Shred & Powershift builds with Shred and finishes with Ferocious Bite.", "Use Shred for bleed-immune bosses (MC/BWL). Swap mid-fight with /ar style.")
@@ -84,6 +94,9 @@ function M:BuildBody(ui, f)
     ui:Tip(self.mfCB.cb, "Moonfire", "Kept up first. At low levels this plus the nuke IS the rotation.")
     ui:Tip(self.isCB.cb, "Insect Swarm", "Kept up right after Moonfire.")
     ui:Tip(self.eclipseCB.cb, "Eclipse reaction", "On a proc, cast the empowered opposite nuke. Casts are queued, so the swap lands the moment the window opens.", "If procs are not detected, run /ar debug with the proc up and report the buff name.")
+    ui:Tip(self.hpCB.cb, "Defensive Bear", "Below the lower value, force Bear Form (using Frenzied Regeneration when known) until HP is back at the upper value.", "Works from any form, including mid-fight in Cat or Moonkin. Inert until Bear Form is learned.")
+    ui:Tip(self.hpLowSlider, "Switch below", "Going under this HP percent shifts you into Bear.")
+    ui:Tip(self.hpHighSlider, "Back above", "Reaching this HP percent releases you back to the preferred form.")
 end
 
 -- ============================================================
@@ -132,6 +145,27 @@ function M:RefreshBody(ui, buf)
     ui:BindCheck(self.mfCB, buf.useMoonfire)
     ui:BindCheck(self.isCB, buf.useInsectSwarm)
     ui:BindCheck(self.eclipseCB, buf.eclipse)
+
+    -- defense block: needs a bear form; sliders follow the checkbox
+    local bearKnown = self:KnowsSpell("Bear Form") or self:KnowsSpell("Dire Bear Form")
+    self.hpCB.cb:SetChecked(buf.hpManage and true or false)
+    if bearKnown then
+        self.hpCB.cb:Enable()
+        self.hpCB.label:SetText(self.hpCB.baseText); ui:Color(self.hpCB.label, ui.COL.white)
+    else
+        self.hpCB.cb:Disable()
+        self.hpCB.label:SetText(self.hpCB.baseText .. " (needs Bear Form)"); ui:Color(self.hpCB.label, ui.COL.grey)
+    end
+    local defOn = bearKnown and buf.hpManage
+    self.hpLowSlider:SetValue(buf.hpLow or 35);   self.hpLowSlider.valText:SetText((buf.hpLow or 35) .. "%")
+    self.hpHighSlider:SetValue(buf.hpHigh or 70); self.hpHighSlider.valText:SetText((buf.hpHigh or 70) .. "%")
+    if defOn then
+        self.hpLowSlider:EnableMouse(true);  self.hpLowSlider:SetAlpha(1)
+        self.hpHighSlider:EnableMouse(true); self.hpHighSlider:SetAlpha(1)
+    else
+        self.hpLowSlider:EnableMouse(false);  self.hpLowSlider:SetAlpha(0.35)
+        self.hpHighSlider:EnableMouse(false); self.hpHighSlider:SetAlpha(0.35)
+    end
 
     -- nuke dropdown: Wrath always (level 1), Starfire once known
     local nOpts = { { label = "Wrath", value = "Wrath" } }
