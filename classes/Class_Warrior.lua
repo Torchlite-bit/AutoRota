@@ -29,9 +29,8 @@ local M = AutoRota:NewClassModule("WARRIOR")
 M.uiTitle = "Warrior"
 M.uiHeight = 730
 
-local function msgOut(text, r, g, b)
-    DEFAULT_CHAT_FRAME:AddMessage("AutoRota: " .. text, r or 1, g or 0.8, b or 0.0)
-end
+-- Chat output is shared in the core; this shim keeps call sites unchanged.
+local function msgOut(text, r, g, b) AutoRota:Msg(text, r, g, b) end
 
 -- Reactive proc windows (seconds). Overpower and Revenge stay usable for
 -- about 5s after the triggering event.
