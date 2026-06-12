@@ -21,9 +21,8 @@ M.uiTitle = "Warlock"
 M.uiHeight = 500
 M.meleeAutoAttack = false   -- caster, no white melee swing
 
-local function msgOut(text, r, g, b)
-    DEFAULT_CHAT_FRAME:AddMessage("AutoRota: " .. text, r or 1, g or 0.8, b or 0.0)
-end
+-- Chat output is shared in the core; this shim keeps call sites unchanged.
+local function msgOut(text, r, g, b) AutoRota:Msg(text, r, g, b) end
 
 -- Debuff textures on the TARGET (fragment match)
 M.dotTex = {
@@ -109,6 +108,18 @@ function M:ProfileValidity(cfg)
     return (table.getn(missing) == 0), missing
 end
 
+-- True while the wand is auto-repeating. The last seen auto-repeat slot is
+-- cached, so the common case (already wanding) costs a single check; the
+-- full action bar scan only runs when the cached slot is not repeating.
+function M:Wanding()
+    local slot = self.wandSlot
+    if slot and IsAutoRepeatAction(slot) then return true end
+    for s = 1, 120 do
+        if IsAutoRepeatAction(s) then self.wandSlot = s; return true end
+    end
+    return false
+end
+
 -- Queue a known spell. Normally this uses SuperWoW's cast queue so a
 -- cast in progress is not clipped. While the wand is auto-repeating,
 -- though, a queued cast would have to wait for the current shot (up to
@@ -116,9 +127,7 @@ end
 -- In that case cast directly, which interrupts the wand and fires now.
 function M:Queue(name)
     if not self:KnowsSpell(name) then return false end
-    local wanding = false
-    for s = 1, 120 do if IsAutoRepeatAction(s) then wanding = true; break end end
-    if wanding or not QueueSpellByName then
+    if self:Wanding() or not QueueSpellByName then
         CastSpellByName(name)
     else
         QueueSpellByName(name)
@@ -226,7 +235,7 @@ function M:Rotate(cfg)
     local filler = cfg.filler or "Shoot"
     if filler == "Shoot" then
         -- spammable wand, only start it if it is not already auto repeating
-        for s = 1, 120 do if IsAutoRepeatAction(s) then return end end
+        if self:Wanding() then return end
         CastSpellByName("Shoot")
     else
         self:Queue(filler)
