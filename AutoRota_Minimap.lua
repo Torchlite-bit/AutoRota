@@ -94,6 +94,10 @@ button:SetScript("OnClick", function()
         -- right-click runs the bare rotation, handy while configuring
         AutoRota:EvalCommand("")
     else
+        if not AutoRotaUI then
+            AutoRota:Throttle("UI not ready yet, try again in a moment.")
+            return
+        end
         AutoRotaUI:Toggle()
     end
 end)
@@ -110,17 +114,32 @@ end)
 button:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 -- ------------------------------------------------------------
--- init at login, once AutoRotaDB (saved per character) is available
+-- initialise: read saved position, class icon, and hide state. Runs at
+-- ADDON_LOADED and PLAYER_LOGIN so it is robust to reload timing.
 -- ------------------------------------------------------------
-local ev = CreateFrame("Frame")
-ev:RegisterEvent("PLAYER_LOGIN")
-ev:SetScript("OnEvent", function()
+local function Init()
     if type(AutoRotaDB) ~= "table" then AutoRotaDB = {} end
     if AutoRotaDB.minimapAngle == nil then AutoRotaDB.minimapAngle = DEFAULT_ANGLE end
     ApplyClassIcon()
     UpdatePos()
     if AutoRotaDB.minimapHide then button:Hide() else button:Show() end
+end
+
+local ev = CreateFrame("Frame")
+ev:RegisterEvent("ADDON_LOADED")
+ev:RegisterEvent("PLAYER_LOGIN")
+ev:RegisterEvent("PLAYER_ENTERING_WORLD")
+ev:SetScript("OnEvent", function()
+    if event == "ADDON_LOADED" and arg1 ~= "AutoRota" then return end
+    Init()
 end)
+
+-- Anchor and show the button right away with defaults, so it is visible
+-- even before the events above fire (some 1.12 clients skip PLAYER_LOGIN on
+-- a /reload, and saved variables may not be ready during file execution).
+-- Init() then refines the saved position, class icon, and hide state.
+UpdatePos()
+if not (AutoRotaDB and AutoRotaDB.minimapHide) then button:Show() end
 
 -- ------------------------------------------------------------
 -- /armap toggles visibility (kept separate from /ar so the core needs
