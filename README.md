@@ -1,4 +1,4 @@
-# AutoRota (v0.6.0b)
+# AutoRota (v0.6.1b)
 
 AutoRota is a lightweight, robust, Configurable one-button rotation, multi class (Turtle WoW 1.12 / SuperWoW). Unlike standard "monolithic" 1.12 macros or basic script loops, AutoRota uses a modern modular architecture, automated frame-by-frame management, and smart situational logic to execute combat rotations.
 
@@ -19,7 +19,7 @@ Version 0.4 introduces a complete graphical configuration panel and database sys
 
 ## ⚠️ Included Class Modules (WiP)
 
-### 🛡️ Paladin 
+### 🛡️ Paladin `(Beta)`
 Engineered around an intelligent "Roleless Seal Model" optimized for low-level leveling up to high-tier raiding:
 - **Debuff Upkeep:** Automatically tracks target debuffs via texture fragments. Applies your chosen *Debuff Seal* (e.g., *Seal of the Crusader* or *Seal of Wisdom*) exactly once per mob, then switches immediately to your *Damage Seal*.
 - **Low-Level Safety Guard:** Built-in safeguards automatically bypass the Judgement/Debuff loop if your Paladin is under level 10 and hasn't learned `Judgement` yet, keeping your damage seal active as a permanent auto-attack buff.
@@ -30,7 +30,7 @@ Engineered around an intelligent "Roleless Seal Model" optimized for low-level l
 - **Consecration (opt-in):** An AoE filler cast on cooldown when enabled. Because the 1.12 client cannot reliably count nearby enemies, it is a manual toggle — the *Consecration (AoE)* checkbox, or `/ar aoe` for a quick keybind flip. It sits last in the priority so it never delays your strikes, *Holy Shield*, seal/Judgement upkeep, or *Hammer of Wrath*, and is held during mana recovery.
 - **Exorcism (opt-in):** Cast on cooldown, but only against *Undead* and *Demon* targets (checked via creature type), and likewise paused while recovering mana.
 
-### 🥷 Rogue 
+### 🥷 Rogue `(Beta)`
 A refined evolution of the *ExAutoRogue* logic focused on efficient combo point generation and finishing priority:
 - **Adaptive Combo Builders:** Automatically chooses your highest efficiency spec builder (*Noxious Assault* if known, falling back to *Sinister Strike*), or allows you to force a fixed weapon builder via a profile dropdown.
 - **Finisher Hysteresis Engine:** Dynamically tracks *Slice and Dice* and *Envenom* buffs. It will auto-refresh them efficiently at exactly 1 Combo Point if they are about to expire, otherwise saving points to dump into maximum-damage *Eviscerates*.
@@ -47,7 +47,7 @@ A roleless, toggle-driven engine covering Arms, Fury, and Protection from early 
 - **Cooldown Automation:** *Death Wish*, *Recklessness*, and *Berserker Rage* fire on cooldown, only on Elite/Boss targets, or fully manually — the same three-state model as the other classes — while *Bloodrage* tops up rage on demand, even before the pull.
 - **Threat Toolkit:** Maintains *Sunder Armor* up to a chosen stack count and weaves *Shield Slam*, *Revenge*, and *Shield Block* upkeep for Protection tanking.
 
-### 🔮 Warlock
+### 🔮 Warlock `(Beta)`
 
 Optimized for efficient DoT upkeep and resource management:
 
@@ -57,11 +57,13 @@ Optimized for efficient DoT upkeep and resource management:
 * **Configurable Filler:** When every enabled DoT is up — wand (mana-free), *Shadow Bolt*, or *Drain Life*. A *Nightfall* option fires the free instant *Shadow Bolt* the moment *Shadow Trance* procs.
 * **Cast Queueing & Pet Support:** Cast-time spells use SuperWoW's `QueueSpellByName` so the rotation never clips a cast (with a smart exception while wanding, where a direct cast fires immediately). Optionally sends your pet onto the target every press.
 
-### 🐾 Druid (Feral) `(Beta)`
+### 🐾 Druid `(Beta)`
 
-Cat (DPS) and Bear (Tank) in one form-adaptive engine:
+Cat (DPS), Bear (Tank), and Balance (Caster/Moonkin) in one form-adaptive engine — working from level 1:
 
-* **Form-Adaptive Rotation:** Each press follows the form you are actually in — Cat Form runs the DPS rotation, Bear/Dire Bear runs the tank rotation, and caster form shifts you into your profile's preferred form (panel dropdown or `/ar form cat|bear`). One profile, one macro, both jobs.
+* **Form-Adaptive Rotation:** Each press follows the form you are actually in — Cat Form runs the DPS rotation, Bear/Dire Bear runs the tank rotation, Moonkin (or a *Caster/Moonkin* preference) runs the Balance rotation, and caster form shifts you into your profile's preferred form (panel dropdown or `/ar form cat|bear|caster`). One profile, one macro, every job.
+* **Level 1 and Up:** Before any combat form is learned (Bear at 10, Cat at 20), the caster rotation carries the character — Moonfire upkeep plus Wrath is exactly the right early-leveling loop — and the profile grows into its form automatically the moment it is trained.
+* **Balance / Eclipse Weaving:** Keeps *Moonfire* and *Insect Swarm* up, then chain-casts your primary nuke (Wrath or Starfire) to fish for **Eclipse** procs and swaps to the empowered opposite nuke the instant one fires. Nukes are queued through SuperWoW, so spamming never clips a cast — the press during your current cast lines up the buffed spell for the moment the proc window opens. Entering Moonkin (when learned) is automatic for the mana discount.
 * **Two Turtle Cat Styles:** *Claw & Bleed* keeps *Rake* and *Rip* rolling and builds with *Claw* (pairs with bleed-energy talents like *Ancient Brutality*); *Shred & Powershift* builds with *Shred* and finishes with *Ferocious Bite* for bleed-immune bosses (MC/BWL). Swap mid-fight with `/ar style bleed|shred`.
 * **Smart Finishers:** At your combo threshold the bleed style applies *Rip* if it is not ticking and spends *Ferocious Bite* while it is — combo points are never dumped into a redundant bleed.
 * **Powershifting (opt-in):** In the Shred style, when energy bottoms out below your slider the rotation shifts to caster and straight back into Cat for a fresh energy bar — and **never while Tiger's Fury is active**, so the buff is not thrown away.
@@ -130,7 +132,7 @@ You can also change profile properties dynamically via chat or macros:
 | `/ar strike <mode>` | *(Paladin Only)* Sets strike mode (`off`/`auto`/`cs`/`hs`/`hscs`). | `/ar strike hs` |
 | `/ar curse <alias>` | *(Warlock Only)* Switches the curse on the active profile. | `/ar curse coe` |
 | `/ar style <bleed/shred>` | *(Druid Only)* Switches the cat style mid-fight. | `/ar style shred` |
-| `/ar form <cat/bear>` | *(Druid Only)* Sets the preferred combat form. | `/ar form bear` |
+| `/ar form <cat/bear/caster>` | *(Druid Only)* Sets the preferred combat form (caster = Balance/Moonkin). | `/ar form caster` |
 | `/ar aoe` | *(Warrior, Paladin & Druid)* Toggles AoE mode (Cleave + Whirlwind / Consecration / Swipe). | `/ar aoe` |
 | `/ar cd <on/elite/off>` | *(Warrior Only)* Sets cooldown usage mode. | `/ar cd elite` |
 | `/ar dance` | *(Warrior Only)* Toggles experimental stance dancing. | `/ar dance` |
