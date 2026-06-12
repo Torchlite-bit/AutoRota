@@ -15,7 +15,7 @@
 -- ============================================================
 
 AutoRota = {
-    ver = "0.4",
+    ver = "0.5.3b",
     classes = {},     -- token -> module table
     active = nil,      -- the module for this character's class
     Loaded = false,
@@ -31,24 +31,53 @@ function AutoRota:NewClassModule(token)
     return m
 end
 
-local function msgOut(text, r, g, b)
+-- Shared chat output, inherited by every class module (so modules use
+-- self:Msg(...) instead of redefining their own local printer).
+function AutoRota:Msg(text, r, g, b)
     DEFAULT_CHAT_FRAME:AddMessage("AutoRota: " .. text, r or 1, g or 0.8, b or 0.0)
 end
+
+local function msgOut(text, r, g, b) AutoRota:Msg(text, r, g, b) end
 
 -- ============================================================
 -- Shared rotation and utility helpers (class independent)
 -- ============================================================
 
-function AutoRota:FindSpellSlot(name)
-    local slot
+-- One pass over the spellbook builds a name -> slot index (last slot wins, so
+-- the highest rank is kept, same as the old linear scan) plus a name -> max
+-- rank table. Every later lookup is then a table read instead of a full scan.
+-- The index is built lazily and dropped on SPELLS_CHANGED, so learning a spell
+-- or a new rank triggers a rebuild on the next lookup.
+function AutoRota:BuildSpellIndex()
+    local idx, ranks = {}, {}
     local i = 1
     while true do
-        local n = GetSpellName(i, BOOKTYPE_SPELL)
+        local n, rnk = GetSpellName(i, BOOKTYPE_SPELL)
         if not n then break end
-        if n == name then slot = i end
+        idx[n] = i
+        local digits = string.gsub(rnk or "", "%D", "")
+        local num = tonumber(digits) or 1
+        if not ranks[n] or num > ranks[n] then ranks[n] = num end
         i = i + 1
     end
-    return slot
+    AutoRota.spellIndex = idx
+    AutoRota.spellRanks = ranks
+end
+
+function AutoRota:InvalidateSpellIndex()
+    AutoRota.spellIndex = nil
+    AutoRota.spellRanks = nil
+end
+
+function AutoRota:FindSpellSlot(name)
+    if not AutoRota.spellIndex then AutoRota:BuildSpellIndex() end
+    return AutoRota.spellIndex[name]
+end
+
+-- Highest known rank number of a spell (0 if unknown). Used for downranking.
+function AutoRota:MaxRank(name)
+    if not AutoRota.spellRanks then AutoRota:BuildSpellIndex() end
+    return AutoRota.spellRanks[name] or 0
 end
 
 function AutoRota:KnowsSpell(name)
@@ -116,16 +145,53 @@ function AutoRota:SwingTimeLeft()
     return self.swingSpeed - math.mod(elapsed, self.swingSpeed)
 end
 
--- Throttled per-press trace, toggled with /pa trace
-function AutoRota:Trace(text)
+-- Throttled per-press trace, toggled with /ar trace. Accepts any number of
+-- lines; the throttle is checked once so multi-line traces are never half
+-- swallowed (Lua 5.0 packs varargs into the implicit `arg` table).
+function AutoRota:Trace(...)
     if not self.trace then return end
     local now = GetTime()
     if now - (self.traceT or 0) < 0.4 then return end
     self.traceT = now
-    DEFAULT_CHAT_FRAME:AddMessage("AR: " .. text, 0.6, 0.8, 1.0)
+    for i = 1, arg.n do
+        if arg[i] then DEFAULT_CHAT_FRAME:AddMessage("AR: " .. arg[i], 0.6, 0.8, 1.0) end
+    end
+end
+
+-- One pass over the player's buffs per rotation press. Every HasBuff/BuffTime
+-- in the same press then reads this table instead of rescanning all 32 slots.
+-- Keyed by GetTime(), which is constant within a frame, so the snapshot can
+-- never be read stale.
+function AutoRota:SnapshotBuffs()
+    if not GetPlayerBuff then return end
+    local snap = {}
+    for i = 0, 31 do
+        local ix = GetPlayerBuff(i, "HELPFUL")
+        if ix and ix ~= -1 then
+            local id = GetPlayerBuffID and GetPlayerBuffID(ix)
+            if id then
+                if id < -1 then id = id + 65536 end
+                local nm = SpellInfo and SpellInfo(id)
+                if nm and not snap[nm] then
+                    local tl = GetPlayerBuffTimeLeft(ix) or 0
+                    local st = (GetPlayerBuffApplications and GetPlayerBuffApplications(ix)) or 1
+                    snap[nm] = { tl, st }
+                end
+            end
+        end
+    end
+    self.buffSnap = snap
+    self.buffSnapT = GetTime()
 end
 
 function AutoRota:ScanBuff(name)
+    -- fresh snapshot from this frame: O(1) read
+    if self.buffSnap and self.buffSnapT == GetTime() then
+        local e = self.buffSnap[name]
+        if e then return e[1], e[2] end
+        return nil, 0
+    end
+    -- no snapshot (UI refresh, slash commands, etc.): full scan as before
     if not GetPlayerBuff then return nil, 0 end
     for i = 0, 31 do
         local ix = GetPlayerBuff(i, "HELPFUL")
@@ -172,13 +238,19 @@ function AutoRota:TargetHPPct()
     return 100
 end
 
+-- The Attack action's bar slot is cached: one IsAttackAction call verifies it
+-- each press, and the full 1..172 scan only runs when the cache is empty or
+-- the button was moved/removed.
 function AutoRota:EnsureAutoAttack()
-    for z = 1, 172 do
-        if IsAttackAction(z) then
-            if not IsCurrentAction(z) then UseAction(z) end
-            return
+    local slot = self.attackSlot
+    if not (slot and IsAttackAction(slot)) then
+        slot = nil
+        for z = 1, 172 do
+            if IsAttackAction(z) then slot = z; break end
         end
+        self.attackSlot = slot
     end
+    if slot and not IsCurrentAction(slot) then UseAction(slot) end
 end
 
 -- A stable id for the current target. SuperWoW returns the GUID as the second
@@ -256,8 +328,10 @@ function AutoRota:DeepCopy(t)
     return r
 end
 
--- A full copy of a profile, then normalized by the active module.
+-- A full copy of a profile, then normalized by the active module. Every UI
+-- save/activate commits through here, so the cached validity is dropped.
 function AutoRota:CopyProfile(p)
+    self.validCacheName = nil
     local c = self:DeepCopy(p)
     if self.active and self.active.NormalizeProfile then self.active:NormalizeProfile(c) end
     return c
@@ -362,9 +436,17 @@ function AutoRota:RunRotation()
         self:Throttle("no profile active. Open /ar ui or use /ar use <name>.")
         return
     end
-    local ok, missing = self:Validity(cfg)
-    if not ok then
-        self:Throttle("active profile incomplete, missing " .. table.concat(missing, ", ") .. ". Running with what is available.")
+    -- Validity is cached per active profile, not recomputed every press: it only
+    -- changes when a spell is learned (SPELLS_CHANGED clears it) or the active
+    -- profile switches/saves (those paths clear it too).
+    if self.validCacheName ~= AutoRotaDB.active then
+        local ok, missing = self:Validity(cfg)
+        self.validCacheName = AutoRotaDB.active
+        self.validCacheOK = ok
+        self.validCacheMissing = missing
+    end
+    if not self.validCacheOK then
+        self:Throttle("active profile incomplete, missing " .. table.concat(self.validCacheMissing, ", ") .. ". Running with what is available.")
     end
 
     if not UnitExists("target") or UnitIsDead("target") then TargetNearestEnemy() end
@@ -372,6 +454,7 @@ function AutoRota:RunRotation()
 
     if self.active.meleeAutoAttack ~= false and not IsAddOnLoaded("SuperCleveRoidMacros") then self:EnsureAutoAttack() end
 
+    self:SnapshotBuffs()
     self.active:Rotate(cfg)
     UIErrorsFrame:Clear()
 end
@@ -402,8 +485,12 @@ function AutoRota:EvalCommand(msg)
         else msgOut("no configuration UI for this class yet.", 1, 0.5, 0.3) end
         return
     end
-    -- class specific subcommands (e.g. seal, spell on the paladin)
-    if self.active and self.active.HandleCommand and self.active:HandleCommand(cmd, t) then return end
+    -- class specific subcommands (e.g. seal, spell on the paladin). These can
+    -- mutate the active profile in place, so the cached validity is dropped.
+    if self.active and self.active.HandleCommand and self.active:HandleCommand(cmd, t) then
+        self.validCacheName = nil
+        return
+    end
 
     msgOut("commands: ui, list, use, off, new, del, check, reset, debug, trace (plus class commands).")
 end
@@ -447,6 +534,7 @@ SlashCmdList["AUTOROTA"] = function(msg) AutoRota:EvalCommand(msg) end
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("ADDON_LOADED")
 ev:RegisterEvent("PLAYER_LOGIN")
+ev:RegisterEvent("SPELLS_CHANGED")
 ev:RegisterEvent("CHAT_MSG_COMBAT_SELF_HITS")
 ev:RegisterEvent("CHAT_MSG_COMBAT_SELF_MISSES")
 ev:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -455,6 +543,11 @@ ev:SetScript("OnEvent", function()
         AutoRota:OnAddonLoaded()
     elseif event == "PLAYER_LOGIN" then
         AutoRota:Banner()
+    elseif event == "SPELLS_CHANGED" then
+        -- learning a spell or rank invalidates the spellbook index and any
+        -- cached profile validity, both rebuilt lazily on the next use
+        AutoRota:InvalidateSpellIndex()
+        AutoRota.validCacheName = nil
     elseif event == "CHAT_MSG_COMBAT_SELF_HITS" or event == "CHAT_MSG_COMBAT_SELF_MISSES" then
         if AutoRota.active then AutoRota.active:OnSwingMessage(arg1) end
     elseif event == "PLAYER_REGEN_ENABLED" then
