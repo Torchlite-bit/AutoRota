@@ -123,15 +123,7 @@ function M:RefreshBody(ui, buf)
     sealDD(self.debuffDD, self.DEBUFF_SEALS, buf.seals.debuff)
     sealDD(self.damageDD, self.DAMAGE_SEALS, buf.seals.damage)
 
-    local function setCB(key)
-        local item = self.spellCB[key]
-        local on = buf.spells[key] and true or false
-        item.cb:SetChecked(on)
-        local known = self:KnowsSpell(item.spellName)
-        if on and not known then item.label:SetText(item.baseText .. " (not learned)"); ui:Color(item.label, ui.COL.red)
-        elseif not known then item.label:SetText(item.baseText .. " (not learned)"); ui:Color(item.label, ui.COL.grey)
-        else item.label:SetText(item.baseText); ui:Color(item.label, ui.COL.white) end
-    end
+    local function setCB(key) ui:BindCheck(self.spellCB[key], buf.spells[key]) end
     setCB("holyShield"); setCB("hammerOfWrath"); setCB("repentance")
     setCB("consecration"); setCB("exorcism")
 
