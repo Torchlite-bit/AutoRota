@@ -77,4 +77,10 @@ function M:RefreshBody(ui, buf)
 end
 
 -- Open the shared window for this class.
-M.OpenConfig = function(mod) AutoRotaUI:Toggle() end
+M.OpenConfig = function(mod)
+    if not AutoRotaUI then
+        AutoRota:Throttle("UI not ready yet, try again in a moment.")
+        return
+    end
+    AutoRotaUI:Toggle()
+end
