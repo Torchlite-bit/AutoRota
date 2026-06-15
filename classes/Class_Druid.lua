@@ -32,6 +32,10 @@
 local M = AutoRota:NewClassModule("DRUID")
 M.uiTitle = "Druid"
 M.uiHeight = 768
+-- Auto-attack is managed per form in this module instead of by the core, so a
+-- white swing is only started in Cat/Bear (where you melee) and never in
+-- caster/Moonkin (where you are casting). See EnsureMeleeSwing below.
+M.meleeAutoAttack = false
 
 -- Chat output is shared in the core; this shim keeps call sites unchanged.
 local function msgOut(text, r, g, b) AutoRota:Msg(text, r, g, b) end
@@ -116,7 +120,18 @@ function M:NormalizeProfile(c)
     if c.useInsectSwarm == nil then c.useInsectSwarm = true end
     if c.eclipse == nil then c.eclipse = true end
     if c.nuke == nil then c.nuke = "Wrath" end
+    if c.useGrowl == nil then c.useGrowl = true end
     return c
+end
+
+-- Start the form's white swing in melee forms. Skipped under
+-- SuperCleveRoidMacros (which manages auto-attack itself), matching the core.
+-- NOTE: the Attack action must sit on a bar slot that is NOT replaced by the
+-- Cat/Bear form bar (e.g. a side/bottom bar), otherwise there is nothing for
+-- this to toggle while shapeshifted.
+function M:EnsureMeleeSwing()
+    if IsAddOnLoaded("SuperCleveRoidMacros") then return end
+    AutoRota:EnsureAutoAttack()
 end
 
 function M:ProfileValidity(cfg)
@@ -244,6 +259,8 @@ function M:RotateCat(cfg)
     local cp = GetComboPoints("player", "target")
     local bleed = (cfg.catStyle ~= "shred")
 
+    self:EnsureMeleeSwing()
+
     if self.trace then
         self:Trace("cat style=" .. (cfg.catStyle or "bleed")
             .. " energy=" .. energy .. " cp=" .. cp
@@ -313,6 +330,8 @@ end
 function M:RotateBear(cfg)
     local rage = UnitMana("player")
 
+    self:EnsureMeleeSwing()
+
     if self.trace then
         self:Trace("bear rage=" .. rage
             .. " def=" .. (self.hpDefenseActive and "Y" or "N")
@@ -322,27 +341,38 @@ function M:RotateBear(cfg)
             .. " enrage=" .. (cfg.useEnrage and self:CDInfo("Enrage") or "-"))
     end
 
-    -- P1 Enrage when rage starved (opt-in; it lowers armor, so only in combat)
-    if cfg.useEnrage and rage < 20 and UnitAffectingCombat("player") and self:OwnCDReady("Enrage") then
-        if self:CastSafe("Enrage") then return end
+    -- P1 Growl to take threat when the target is not already focused on us.
+    -- Covers the pull (target has no aggro yet) and any aggro loss in a group;
+    -- a solo druid who is already being attacked never wastes the taunt.
+    if cfg.useGrowl and self:KnowsSpell("Growl") and self:IsReady("Growl") then
+        if not (UnitExists("targettarget") and UnitIsUnit("targettarget", "player")) then
+            if self:CastSafe("Growl") then return end
+        end
     end
 
-    -- P2 Faerie Fire (Feral), free threat and the armor debuff
+    -- P2 Faerie Fire (Feral): the bear's ranged opener. Instant, 30yd, applies
+    -- the armor debuff and deals threat+damage, so it starts the pull from
+    -- range (Moonfire cannot be cast in bear form; this is its bear analog).
     if cfg.ffBear and not self:DebuffUp("Faerie Fire (Feral)") then
         if self:CastSafe("Faerie Fire (Feral)") then return end
     end
 
-    -- P3 Demoralizing Roar upkeep
+    -- P3 Enrage when rage starved (opt-in; it lowers armor, so only in combat)
+    if cfg.useEnrage and rage < 20 and UnitAffectingCombat("player") and self:OwnCDReady("Enrage") then
+        if self:CastSafe("Enrage") then return end
+    end
+
+    -- P4 Demoralizing Roar upkeep
     if cfg.useDemo and self:KnowsSpell("Demoralizing Roar") and not self:DebuffUp("Demoralizing Roar") then
         if self:CanPay("Demoralizing Roar") and self:CastSafe("Demoralizing Roar") then return end
     end
 
-    -- P4 Swipe leads when the AoE toggle is on
+    -- P5 Swipe leads when the AoE toggle is on
     if cfg.aoeSwipe and self:CanPay("Swipe") then
         if self:CastSafe("Swipe") then return end
     end
 
-    -- P5 Maul as the rage dump (queues on the next swing)
+    -- P6 Maul as the rage dump (queues on the next swing)
     if cfg.useMaul and self:CanPay("Maul") then
         if self:CastSafe("Maul") then return end
     end
