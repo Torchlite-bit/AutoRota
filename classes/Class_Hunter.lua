@@ -1,58 +1,48 @@
 -- ============================================================
 -- Class_Hunter  -  hunter module for AutoRota
--- Turtle WoW 1.18.1 (SuperWoW). Reworked for Turtle's hunter changes.
+-- Turtle WoW 1.12 (SuperWoW). Ranged priority, configurable, all specs.
 -- ============================================================
--- Turtle 1.18.1 reshaped the hunter heavily, so this module is built around
--- the live playstyles rather than vanilla:
---  * RANGED (BM / MM): Auto Shot is the damage backbone. Steady Shot (now
---    baseline at 20) weaves 1:1 after each Auto Shot, with Arcane Shot and
---    Multi-Shot weaved as instants. Aimed Shot is NOT pressed on cooldown
---    (it clips Auto Shot) - it is only fired when the Marksmanship capstone
---    "Lock and Load" procs (crit from Steady/Aimed/Arcane resets Aimed Shot,
---    drops its cast time, and makes it cleave a line), or optionally on
---    cooldown if you turn the proc-only guard off.
---  * MELEE (Survival / BM-melee): Aspect of the Wolf, melee auto-attack,
---    Raptor Strike on cooldown, Mongoose Bite reactively after you dodge,
---    optional Wing Clip. Survival can also drop Immolation Trap on cooldown
---    in combat (a 1.18.1 change) and weave shots.
---  * Mana aspect swap: at a low-mana threshold the rotation swaps to the
---    mana-regenerating aspect, then back to the combat aspect once recovered
---    (hysteresis, so it does not flap at the boundary).
---  * Pet: attack, Mend Pet when hurt, Kill Command on cooldown (BM), and an
---    optional Baited Shot reaction when the pet crits.
--- Exact spell strings are gated by KnowsSpell, so an ability the character or
--- the server does not have simply no-ops instead of breaking the chain.
+-- Model:
+--  * Hunters fight at range around Auto Shot, weaving instants between
+--    shots. Auto Shot is a toggle (like the warlock wand), so it is kept
+--    running rather than recast every press: a press that fires an instant
+--    never stops the shot.
+--  * One GCD ability is chosen per press by strict priority with early
+--    returns, the same single-cast discipline the other modules use. Off-GCD
+--    layers (pet attack, burst cooldowns) fire and continue.
+--  * Debuff upkeep (Hunter's Mark, the chosen Sting) uses the core's
+--    SuperWoW name detection with a per-target throttle, so it is applied
+--    exactly once and refreshed only when it falls off.
+--  * AoE has no reliable enemy counter on 1.12, so it is a manual toggle
+--    (/ar aoe) that leads with Volley / Multi-Shot.
+--  * Cooldowns follow the rogue/warrior pattern: pop always, only on
+--    elite/boss, or never. Rapid Fire plus Bestial Wrath / Intimidation
+--    when those are known.
+--  * Optional melee weave: when the target is in melee range, Raptor Strike
+--    is used and melee auto-attack is started, so a mob in your face still
+--    takes damage instead of standing in a dead zone.
 -- ============================================================
 
 local M = AutoRota:NewClassModule("HUNTER")
 M.uiTitle = "Hunter"
-M.uiHeight = 800
-M.meleeAutoAttack = false   -- managed here: Auto Shot (ranged) or Attack (melee)
+M.uiHeight = 644
+M.meleeAutoAttack = false   -- ranged class: Auto Shot is managed here instead
 
 -- Chat output is shared in the core; this shim keeps call sites unchanged.
 local function msgOut(text, r, g, b) AutoRota:Msg(text, r, g, b) end
 
+-- Light throttle so a rapid press burst does not re-toggle Auto Shot or
+-- re-apply an instant debuff several times before it registers.
 local MEND_PET_CD = 12   -- Mend Pet HoT lasts ~15s, refresh a little early
-local REACT_WINDOW = 5.0 -- Mongoose Bite stays usable ~5s after a dodge
-local PETCRIT_WINDOW = 4.0
-local MANA_ASPECT_HYST = 15   -- swap back to the combat aspect this far above the low mark
 
--- The mana-regenerating aspect (Turtle). First known name is used; gated by
--- KnowsSpell so an unknown name is simply inert.
-M.MANA_ASPECTS = { "Aspect of the Viper", "Aspect of the Beast" }
-
--- Stings are mutually exclusive (one debuff slot). Durations are only the
--- reapply interval on clients without SuperWoW name resolution.
+-- The three stings are mutually exclusive (one debuff slot). Durations are
+-- only used as the reapply interval on clients without SuperWoW name
+-- resolution; with SuperWoW the real debuff is seen and the timer is moot.
 M.STINGS = { "Serpent Sting", "Scorpid Sting", "Viper Sting" }
 local STING_DUR = {
     ["Serpent Sting"] = 15,
     ["Scorpid Sting"] = 20,
     ["Viper Sting"]   = 8,
-}
-
-M.modeAlias = {
-    ranged = "ranged", range = "ranged", ["r"] = "ranged",
-    melee = "melee", ["m"] = "melee",
 }
 
 M.stingAlias = {
@@ -64,111 +54,70 @@ M.stingAlias = {
 
 M.spellAlias = {
     mark = "useHuntersMark", hm = "useHuntersMark",
-    steady = "useSteadyShot", st = "useSteadyShot",
     arcane = "useArcaneShot", as = "useArcaneShot",
     multi = "useMultiShot", ms = "useMultiShot",
     aimed = "useAimedShot", aim = "useAimedShot",
     volley = "useVolley",
+    aspect = "useAspectHawk", hawk = "useAspectHawk",
     raptor = "useRaptorStrike", rs = "useRaptorStrike",
-    mongoose = "useMongooseBite", mb = "useMongooseBite",
-    wingclip = "useWingClip", wc = "useWingClip",
-    immolation = "useImmolationTrap", trap = "useImmolationTrap",
-    aspect = "useAspect",
-    killcommand = "useKillCommand", kc = "useKillCommand",
-    baited = "useBaitedShot",
     mend = "useMendPet",
 }
 
 -- Templates: starting presets, copied into the char's saved profiles once.
 M.templates = {
-    starter = {  -- valid from level 1: Auto Shot + Serpent Sting + Arcane
-        mode = "ranged",
+    starter = {  -- valid from level 1: Mark, Serpent Sting, Arcane, Auto Shot
         useHuntersMark = true, sting = "Serpent Sting",
-        useSteadyShot = true, useArcaneShot = true, useMultiShot = false,
-        useAimedShot = false, aimedOnlyOnProc = true,
-        aoeMode = false, useVolley = false, useImmolationTrap = false,
-        useRaptorStrike = true, useMongooseBite = true, useWingClip = false,
-        useAspect = true, rangedAspect = "Aspect of the Hawk",
-        useManaAspect = false, manaAspectPct = 30,
+        useArcaneShot = true, useMultiShot = false, useAimedShot = false,
+        aoeMode = false, useVolley = false,
+        useAspectHawk = true,
         petAttack = true, useMendPet = true, mendPetHp = 50,
-        useKillCommand = false, useBaitedShot = false,
         popCDs = false, autoCDElite = false,
-    },
-    beastmastery = {
-        mode = "ranged",
-        useHuntersMark = true, sting = "Serpent Sting",
-        useSteadyShot = true, useArcaneShot = true, useMultiShot = true,
-        useAimedShot = false, aimedOnlyOnProc = true,
-        aoeMode = false, useVolley = false, useImmolationTrap = false,
-        useRaptorStrike = true, useMongooseBite = true, useWingClip = false,
-        useAspect = true, rangedAspect = "Aspect of the Hawk",
-        useManaAspect = true, manaAspectPct = 30,
-        petAttack = true, useMendPet = true, mendPetHp = 60,
-        useKillCommand = true, useBaitedShot = true,
-        popCDs = false, autoCDElite = true,
+        useRaptorStrike = true,
     },
     marksmanship = {
-        mode = "ranged",
         useHuntersMark = true, sting = "Serpent Sting",
-        useSteadyShot = true, useArcaneShot = true, useMultiShot = true,
-        useAimedShot = true, aimedOnlyOnProc = true,
-        aoeMode = false, useVolley = false, useImmolationTrap = false,
-        useRaptorStrike = false, useMongooseBite = false, useWingClip = false,
-        useAspect = true, rangedAspect = "Aspect of the Hawk",
-        useManaAspect = true, manaAspectPct = 25,
+        useArcaneShot = true, useMultiShot = true, useAimedShot = true,
+        aoeMode = false, useVolley = false,
+        useAspectHawk = true,
         petAttack = true, useMendPet = true, mendPetHp = 40,
-        useKillCommand = false, useBaitedShot = false,
         popCDs = false, autoCDElite = true,
+        useRaptorStrike = false,
     },
-    survival = {  -- hybrid: trap + melee, weaving shots
-        mode = "melee",
+    beastmastery = {
         useHuntersMark = true, sting = "Serpent Sting",
-        useSteadyShot = true, useArcaneShot = true, useMultiShot = true,
-        useAimedShot = false, aimedOnlyOnProc = true,
-        aoeMode = false, useVolley = false, useImmolationTrap = true,
-        useRaptorStrike = true, useMongooseBite = true, useWingClip = false,
-        useAspect = true, rangedAspect = "Aspect of the Hawk",
-        useManaAspect = true, manaAspectPct = 30,
-        petAttack = true, useMendPet = true, mendPetHp = 50,
-        useKillCommand = false, useBaitedShot = false,
-        popCDs = false, autoCDElite = true,
-    },
-    melee = {  -- BM / melee weave
-        mode = "melee",
-        useHuntersMark = true, sting = "Serpent Sting",
-        useSteadyShot = false, useArcaneShot = false, useMultiShot = false,
-        useAimedShot = false, aimedOnlyOnProc = true,
-        aoeMode = false, useVolley = false, useImmolationTrap = false,
-        useRaptorStrike = true, useMongooseBite = true, useWingClip = false,
-        useAspect = true, rangedAspect = "Aspect of the Hawk",
-        useManaAspect = false, manaAspectPct = 30,
+        useArcaneShot = true, useMultiShot = true, useAimedShot = false,
+        aoeMode = false, useVolley = false,
+        useAspectHawk = true,
         petAttack = true, useMendPet = true, mendPetHp = 60,
-        useKillCommand = true, useBaitedShot = true,
         popCDs = false, autoCDElite = true,
+        useRaptorStrike = false,
+    },
+    survival = {
+        useHuntersMark = true, sting = "Serpent Sting",
+        useArcaneShot = true, useMultiShot = true, useAimedShot = false,
+        aoeMode = false, useVolley = false,
+        useAspectHawk = true,
+        petAttack = true, useMendPet = true, mendPetHp = 50,
+        popCDs = false, autoCDElite = true,
+        useRaptorStrike = true,
     },
 }
 
 function M:NormalizeProfile(c)
     local b = {
-        mode = "ranged",
         useHuntersMark = true, sting = "Serpent Sting",
-        useSteadyShot = true, useArcaneShot = true, useMultiShot = false,
-        useAimedShot = false, aimedOnlyOnProc = true,
-        aoeMode = false, useVolley = false, useImmolationTrap = false,
-        useRaptorStrike = true, useMongooseBite = true, useWingClip = false,
-        useAspect = true, rangedAspect = "Aspect of the Hawk",
-        useManaAspect = false, manaAspectPct = 30,
+        useArcaneShot = true, useMultiShot = false, useAimedShot = false,
+        aoeMode = false, useVolley = false,
+        useAspectHawk = true,
         petAttack = true, useMendPet = true, mendPetHp = 50,
-        useKillCommand = false, useBaitedShot = false,
         popCDs = false, autoCDElite = false,
+        useRaptorStrike = true,
     }
     for k, v in pairs(b) do
         if c[k] == nil then c[k] = v end
     end
-    if c.mode ~= "ranged" and c.mode ~= "melee" then c.mode = "ranged" end
+    -- a stored sting the player never had should still normalize cleanly
     if type(c.sting) ~= "string" then c.sting = "Serpent Sting" end
-    if type(c.rangedAspect) ~= "string" then c.rangedAspect = "Aspect of the Hawk" end
-    -- migrate the old ranged-only schema (useArcaneShot etc. carried over)
     return c
 end
 
@@ -188,18 +137,12 @@ function M:AvailableStingsOf()
     return out
 end
 
-function M:KnownManaAspect()
-    for i = 1, table.getn(self.MANA_ASPECTS) do
-        if self:KnowsSpell(self.MANA_ASPECTS[i]) then return self.MANA_ASPECTS[i] end
-    end
-    return nil
-end
-
 -- ============================================================
 -- Auto Shot upkeep. Auto Shot is an auto-repeat toggle: casting it while it
--- is already running turns it OFF. It is only (re)started when not repeating.
--- IsAutoRepeatAction sees it on an action bar; when it is not, an assumed-on
--- flag per target prevents toggling it off by accident.
+-- is already running turns it OFF. So it is only (re)started when it is not
+-- repeating. IsAutoRepeatAction sees it when it is on an action bar; when it
+-- is not, we fall back to an assumed-on flag per target so we never toggle it
+-- off by accident.
 -- ============================================================
 function M:AutoShotting()
     local slot = self.autoShotSlot
@@ -213,18 +156,12 @@ end
 function M:EnsureAutoShot()
     if self:AutoShotting() then self.autoShotOn = true; return end
     local id = self:TargetId()
+    -- already started on this target and not visibly repeating (Auto Shot not
+    -- on a bar): leave it, recasting would only toggle it off.
     if self.autoShotOn and self.autoShotTarget == id then return end
     CastSpellByName("Auto Shot")
     self.autoShotOn = true
     self.autoShotTarget = id
-end
-
--- Queue a shot through SuperWoW/Nampower so the weave lands without clipping
--- the Auto Shot in progress; falls back to a direct cast without the queue.
-function M:Queue(name)
-    if not self:KnowsSpell(name) then return false end
-    if QueueSpellByName then QueueSpellByName(name) else CastSpellByName(name) end
-    return true
 end
 
 -- ============================================================
@@ -237,11 +174,12 @@ M.debuffThrottle = {}
 function M:MaintainDebuff(name, interval)
     if not self:KnowsSpell(name) then return false end
     if self:TargetDebuffUp(name, nil) then return false end
+    local detectable = AutoRota:CanResolveDebuffNames()
     local id = self:TargetId()
     local rec = self.debuffThrottle[name]
     local now = GetTime()
     if rec and rec.id == id and rec.t and (now - rec.t) <= (interval or 3) then
-        return false
+        return false   -- detectable: still landing; otherwise assumed up on the timer
     end
     self.debuffThrottle[name] = { id = id, t = now }
     return self:Cast(name)
@@ -254,38 +192,6 @@ function M:PetHPPct()
     return 100
 end
 
--- Mana aspect hysteresis: drop to the mana aspect below the low mark, swap
--- back to the combat aspect once mana climbs a buffer above it.
-function M:UpdateAspectState(cfg)
-    if cfg.useManaAspect and self:KnownManaAspect() then
-        local mp = self:ManaPct()
-        local low = cfg.manaAspectPct or 30
-        if mp < low then self.manaAspectActive = true end
-        if mp >= (low + MANA_ASPECT_HYST) then self.manaAspectActive = false end
-    else
-        self.manaAspectActive = false
-    end
-end
-
--- Keep the right aspect up. Returns true if an aspect was cast this press.
-function M:EnsureAspect(cfg, melee)
-    if not cfg.useAspect then return false end
-    if melee then
-        if self:KnowsSpell("Aspect of the Wolf") and not self:HasBuff("Aspect of the Wolf") then
-            return self:Cast("Aspect of the Wolf")
-        end
-        return false
-    end
-    if self.manaAspectActive then
-        local ma = self:KnownManaAspect()
-        if ma and not self:HasBuff(ma) then return self:Cast(ma) end
-        return false
-    end
-    local ra = cfg.rangedAspect or "Aspect of the Hawk"
-    if self:KnowsSpell(ra) and not self:HasBuff(ra) then return self:Cast(ra) end
-    return false
-end
-
 -- ============================================================
 -- Rotation
 -- ============================================================
@@ -296,154 +202,102 @@ function M:Rotate(cfg)
     local aoe      = cfg.aoeMode and true or false
     local inCombat = UnitAffectingCombat("player")
     local inMelee  = self:InMeleeRange()
-    local melee    = (cfg.mode == "melee")
-
-    self:UpdateAspectState(cfg)
+    local meleeWeave = cfg.useRaptorStrike and inMelee and self:KnowsSpell("Raptor Strike")
 
     if self.trace then
-        self:Trace("mode=" .. (cfg.mode or "ranged")
-            .. " sting=" .. (cfg.sting ~= "" and cfg.sting or "-")
+        self:Trace("sting=" .. (cfg.sting ~= "" and cfg.sting or "-")
             .. " mark=" .. (cfg.useHuntersMark and (self:TargetDebuffUp("Hunter's Mark", nil) and "Y" or "n") or "-")
-            .. " L&L=" .. (self:HasBuff("Lock and Load") and "Y" or "n")
             .. " auto=" .. (self:AutoShotting() and "Y" or (self.autoShotOn and "assumed" or "N"))
-            .. " manaAsp=" .. (self.manaAspectActive and "Y" or "n")
-            .. " mongoose=" .. ((now < (self.dodgeUntil or 0)) and "Y" or "n")
-            .. " elite=" .. (isElite and "Y" or "N"))
+            .. " melee=" .. (inMelee and "Y" or "N")
+            .. " aoe=" .. (aoe and "Y" or "N")
+            .. " elite=" .. (isElite and "Y" or "N")
+            .. " pet=" .. (UnitExists("pet") and string.format("%.0f%%", self:PetHPPct()) or "-"))
     end
 
     -- ----------------------------------------------------------------
     -- 0. Off-GCD / fire-and-continue layer
     -- ----------------------------------------------------------------
+    -- 0a. Pet attack.
     if cfg.petAttack and UnitExists("pet") then PetAttack() end
 
+    -- 0b. Burst cooldowns (off the GCD), gated by the pop mode and combat.
     local popBurst = cfg.popCDs or (cfg.autoCDElite and isElite)
     if popBurst and inCombat then
         if self:KnowsSpell("Rapid Fire") and self:IsReady("Rapid Fire") then self:Cast("Rapid Fire") end
         if self:KnowsSpell("Bestial Wrath") and self:IsReady("Bestial Wrath") then self:Cast("Bestial Wrath") end
     end
-    -- Kill Command is rotational for BM: fire on cooldown in combat (off GCD).
-    if cfg.useKillCommand and inCombat and self:KnowsSpell("Kill Command") and self:IsReady("Kill Command") then
-        self:Cast("Kill Command")
-    end
-    -- Baited Shot reaction inside the short window after the pet crits.
-    if cfg.useBaitedShot and self:KnowsSpell("Baited Shot")
-        and now < (self.petCritUntil or 0) and self:IsReady("Baited Shot") then
-        self:Cast("Baited Shot")
-    end
 
-    -- ----------------------------------------------------------------
-    -- 1. Aspect upkeep (one GCD cast when missing or swapping)
-    -- ----------------------------------------------------------------
-    if self:EnsureAspect(cfg, melee) then return end
-
-    -- Auto-attack backbone: ranged keeps Auto Shot firing; melee starts swings.
-    if melee then
+    -- 0c. Ranged auto-attack upkeep, unless we are meleeing something on top
+    --     of us (then start melee swings instead so Raptor Strike can land).
+    if meleeWeave then
         AutoRota:EnsureAutoAttack()
     else
         self:EnsureAutoShot()
     end
 
     -- ----------------------------------------------------------------
-    -- 2. GCD priority (strict, one cast per press via early return)
+    -- 1. GCD priority (strict, one cast per press via early return)
     -- ----------------------------------------------------------------
 
-    -- 2a. Mend Pet when the pet is hurting (throttled, HoT lasts ~15s).
+    -- 1a. Mend Pet when the pet is hurting (throttled, the HoT lasts ~15s).
     if cfg.useMendPet and UnitExists("pet") and self:KnowsSpell("Mend Pet") then
         if self:PetHPPct() < (cfg.mendPetHp or 50) and (now - (self.mendPetT or 0)) > MEND_PET_CD then
             if self:Cast("Mend Pet") then self.mendPetT = now; return end
         end
     end
 
-    -- 2b. Lock and Load reaction (MM capstone): cast Aimed Shot NOW. The proc
-    --     drops its cast time and makes it cleave a line, so it never clips.
-    if cfg.useAimedShot and self:KnowsSpell("Aimed Shot") and self:HasBuff("Lock and Load") then
-        if self:Queue("Aimed Shot") then return end
+    -- 1b. Keep Aspect of the Hawk up (ranged attack speed/power).
+    if cfg.useAspectHawk and self:KnowsSpell("Aspect of the Hawk")
+        and not self:HasBuff("Aspect of the Hawk") then
+        if self:Cast("Aspect of the Hawk") then return end
     end
 
-    -- 2c. Hunter's Mark upkeep.
+    -- 1c. Hunter's Mark upkeep.
     if cfg.useHuntersMark then
         if self:MaintainDebuff("Hunter's Mark", 110) then return end
     end
 
-    -- 2d. Sting upkeep (the one configured slot).
+    -- 1d. Sting upkeep (the one configured slot).
     if cfg.sting ~= "" then
         if self:MaintainDebuff(cfg.sting, STING_DUR[cfg.sting] or 12) then return end
     end
 
-    -- 2e. Immolation Trap on cooldown (Survival, usable in combat on 1.18.1).
-    if cfg.useImmolationTrap and self:KnowsSpell("Immolation Trap") and self:IsReady("Immolation Trap") then
-        if self:Cast("Immolation Trap") then return end
-    end
-
-    -- ----------------------------------------------------------------
-    -- 3a. Melee branch
-    -- ----------------------------------------------------------------
-    if melee then
-        -- Mongoose Bite reactively after we dodge an enemy attack.
-        if cfg.useMongooseBite and self:KnowsSpell("Mongoose Bite")
-            and now < (self.dodgeUntil or 0) and self:IsReady("Mongoose Bite") then
-            self.dodgeUntil = 0
-            if self:Cast("Mongoose Bite") then return end
-        end
-        -- Raptor Strike on cooldown (queues on the next melee swing).
-        if cfg.useRaptorStrike and self:KnowsSpell("Raptor Strike") and self:IsReady("Raptor Strike") then
-            if self:Cast("Raptor Strike") then return end
-        end
-        -- Wing Clip (optional kite / slow).
-        if cfg.useWingClip and self:KnowsSpell("Wing Clip") and self:IsReady("Wing Clip") then
-            if self:Cast("Wing Clip") then return end
-        end
-        return
-    end
-
-    -- ----------------------------------------------------------------
-    -- 3b. Ranged branch
-    -- ----------------------------------------------------------------
-    -- AoE leads with Volley then Multi-Shot when toggled on.
+    -- 1e. AoE leads with Volley (channel) then Multi-Shot when toggled on.
     if aoe then
         if cfg.useVolley and self:KnowsSpell("Volley") and self:IsReady("Volley") then
-            if self:Queue("Volley") then return end
+            if self:Cast("Volley") then return end
         end
         if cfg.useMultiShot and self:KnowsSpell("Multi-Shot") and self:IsReady("Multi-Shot") then
-            if self:Queue("Multi-Shot") then return end
+            if self:Cast("Multi-Shot") then return end
         end
     end
 
-    -- Multi-Shot on cooldown.
+    -- 1f. Melee weave: Raptor Strike queues on the next melee swing.
+    if meleeWeave and self:IsReady("Raptor Strike") then
+        if self:Cast("Raptor Strike") then return end
+    end
+
+    -- 1g. Multi-Shot on cooldown (single target too, when enabled).
     if cfg.useMultiShot and self:KnowsSpell("Multi-Shot") and self:IsReady("Multi-Shot") then
-        if self:Queue("Multi-Shot") then return end
+        if self:Cast("Multi-Shot") then return end
     end
 
-    -- Arcane Shot on cooldown (instant weave).
+    -- 1h. Arcane Shot on cooldown, the staple instant nuke.
     if cfg.useArcaneShot and self:KnowsSpell("Arcane Shot") and self:IsReady("Arcane Shot") then
-        if self:Queue("Arcane Shot") then return end
+        if self:Cast("Arcane Shot") then return end
     end
 
-    -- Aimed Shot on cooldown ONLY when the proc-only guard is off (it clips
-    -- Auto Shot otherwise; the Lock and Load reaction above is the safe path).
-    if cfg.useAimedShot and not cfg.aimedOnlyOnProc
-        and self:KnowsSpell("Aimed Shot") and self:IsReady("Aimed Shot") then
-        if self:Queue("Aimed Shot") then return end
-    end
-
-    -- Steady Shot, the 1:1 weave / primary filler after each Auto Shot.
-    if cfg.useSteadyShot and self:KnowsSpell("Steady Shot") then
-        if self:Queue("Steady Shot") then return end
+    -- 1i. Aimed Shot (Marksmanship). It has a cast time, so it is queued to
+    --     avoid clipping the current shot when SuperWoW is present.
+    if cfg.useAimedShot and self:KnowsSpell("Aimed Shot") and self:IsReady("Aimed Shot") then
+        if QueueSpellByName then QueueSpellByName("Aimed Shot") else CastSpellByName("Aimed Shot") end
+        return
     end
 end
 
 -- ============================================================
 -- Class specific slash subcommands, dispatched from the core
 -- ============================================================
-function M:CmdMode(alias)
-    local cfg = AutoRota:GetActiveProfile()
-    if not cfg then msgOut("no profile active.", 1, 0.5, 0.3); return end
-    local mode = self.modeAlias[string.lower(alias or "")]
-    if not mode then msgOut("usage: /ar mode ranged|melee", 1, 0.5, 0.3); return end
-    cfg.mode = mode
-    msgOut("playstyle = " .. mode .. ".")
-end
-
 function M:CmdSting(alias)
     local cfg = AutoRota:GetActiveProfile()
     if not cfg then msgOut("no profile active.", 1, 0.5, 0.3); return end
@@ -488,7 +342,6 @@ function M:CmdSpell(alias, onoff)
 end
 
 function M:HandleCommand(cmd, t)
-    if cmd == "mode"  then self:CmdMode(t[2]); return true end
     if cmd == "sting" then self:CmdSting(t[2]); return true end
     if cmd == "aoe"   then self:CmdAoe(); return true end
     if cmd == "cd"    then self:CmdCd(t[2]); return true end
@@ -497,24 +350,12 @@ function M:HandleCommand(cmd, t)
 end
 
 -- ============================================================
--- Event tracking: Auto Shot reset on leaving combat, the Mongoose Bite dodge
--- window (we dodged an enemy attack), and the pet-crit window for Baited Shot.
+-- Auto Shot state reset: leaving combat stops Auto Shot, so clear the
+-- assumed-on flag and let the next pull restart it cleanly.
 -- ============================================================
 local hunterFrame = CreateFrame("Frame")
 hunterFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-hunterFrame:RegisterEvent("CHAT_MSG_COMBAT_CREATURE_VS_SELF_MISSES")  -- enemy attacks we avoided
-hunterFrame:RegisterEvent("CHAT_MSG_COMBAT_PET_HITS")                 -- our pet's damage
 hunterFrame:SetScript("OnEvent", function()
-    if event == "PLAYER_REGEN_ENABLED" then
-        M.autoShotOn = false
-        M.autoShotTarget = nil
-    elseif event == "CHAT_MSG_COMBAT_CREATURE_VS_SELF_MISSES" then
-        if arg1 and string.find(string.lower(arg1), "dodge") then
-            M.dodgeUntil = GetTime() + REACT_WINDOW
-        end
-    elseif event == "CHAT_MSG_COMBAT_PET_HITS" then
-        if arg1 and string.find(string.lower(arg1), "crit") then
-            M.petCritUntil = GetTime() + PETCRIT_WINDOW
-        end
-    end
+    M.autoShotOn = false
+    M.autoShotTarget = nil
 end)
