@@ -81,7 +81,9 @@ M.spellAlias = {
 
 -- Templates: starting presets, copied into the char's saved profiles once.
 M.templates = {
-    starter = {  -- valid from level 1: Auto Shot + Serpent Sting + Arcane
+    starter = {  -- usable from level 1: Auto Shot now, the rest auto-enable as
+                 -- they are learned (Serpent Sting L4, Hunter's Mark/Arcane L6,
+                 -- Aspect of the Hawk L10, Steady Shot L20)
         mode = "ranged",
         useHuntersMark = true, sting = "Serpent Sting",
         useSteadyShot = true, useArcaneShot = true, useMultiShot = false,
@@ -174,10 +176,14 @@ end
 
 -- Only an explicitly chosen sting the character cannot cast is flagged; every
 -- other ability degrades gracefully through KnowsSpell while leveling.
+-- Everything in the hunter kit degrades gracefully through KnowsSpell in the
+-- rotation, so nothing here is strictly required. In particular a configured
+-- sting that is not learned yet is NOT flagged: Serpent Sting is level 4, so
+-- a level 1-3 hunter (or any sting picked before it is trained) should still
+-- read as a clean, usable profile and simply Auto Shot until the sting lands.
+-- This mirrors the druid, which does not flag a not-yet-learned form.
 function M:ProfileValidity(cfg)
-    local missing = {}
-    if cfg.sting ~= "" and not self:KnowsSpell(cfg.sting) then table.insert(missing, cfg.sting) end
-    return (table.getn(missing) == 0), missing
+    return true, {}
 end
 
 function M:AvailableStingsOf()

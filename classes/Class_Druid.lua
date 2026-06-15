@@ -124,13 +124,25 @@ function M:NormalizeProfile(c)
     return c
 end
 
--- Start the form's white swing in melee forms. Skipped under
--- SuperCleveRoidMacros (which manages auto-attack itself), matching the core.
+-- Start the form's white swing in melee forms (Cat/Bear). This runs whether
+-- or not SuperCleveRoidMacros is loaded: the core's EnsureAutoAttack only
+-- toggles Attack when you are NOT already swinging (its IsCurrentAction guard),
+-- so if SCRM already started the swing this is a no-op, and if nothing did
+-- (e.g. a bare "/ar" macro gives SCRM no /startattack to hook) AutoRota starts
+-- it. Either way the swing runs, with no double-toggle.
 -- NOTE: the Attack action must sit on a bar slot that is NOT replaced by the
--- Cat/Bear form bar (e.g. a side/bottom bar), otherwise there is nothing for
+-- Cat/Bear form bar (a side or bottom bar), otherwise there is nothing for
 -- this to toggle while shapeshifted.
 function M:EnsureMeleeSwing()
-    if IsAddOnLoaded("SuperCleveRoidMacros") then return end
+    -- Shapeshifting swaps the whole action bar AND stops the current swing, so
+    -- the core's cached Attack slot can be stale the first press in a new form.
+    -- Drop it on a form change to force one fresh scan, which re-finds Attack
+    -- on the now-current bars and restarts the swing that the shift halted.
+    local form = self:CurrentForm() or "none"
+    if form ~= self.lastSwingForm then
+        AutoRota.attackSlot = nil
+        self.lastSwingForm = form
+    end
     AutoRota:EnsureAutoAttack()
 end
 
