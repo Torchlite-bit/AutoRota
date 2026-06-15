@@ -4,6 +4,27 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.7.2b — Stability Pass: Druid Swing & Hunter Leveling
+
+A correctness release from a full project review. No new features — two
+targeted bug fixes and a version cleanup (the core banner had jumped ahead to
+`0.8.0b`; everything is now back in sync at `0.7.2b`).
+
+### 🐾 Fixed: Druid auto-attack dropping (form changes + with/without SCRM)
+- The core caches the Attack action's bar slot for speed and only re-scans when that slot stops being an attack action. But shapeshifting swaps the entire action bar **and** stops the current swing, so after a Cat↔Bear change the cached slot could point at the wrong bar position and the white swing would silently fail to restart — the intermittent "auto-attack sometimes stops" report.
+- The Druid now **drops the cached slot on every form change**, forcing one fresh scan on the first press in the new form, which re-finds Attack on the now-current bars and restarts the swing the shift halted. Same-form returns (e.g. a Cat→caster→Cat powershift) were already self-healed by the existing "use only if not current" guard; this closes the melee→melee gap.
+- **Auto-attack now works whether or not SuperCleveRoidMacros is loaded.** Previously, when SCRM was present, AutoRota skipped its own auto-attack handling entirely and deferred to SCRM — but a bare `/ar` macro gives SCRM no `/startattack` to hook, so the swing never started (you would see the rotation taunt and use abilities but not auto-attack). The skip is removed in both the Druid module and the core: `EnsureAutoAttack` only toggles Attack when you are *not* already swinging, so it is a no-op if SCRM already started the swing and fills the gap if nothing did — conflict-free for both player populations. This core change applies the same robustness to Paladin, Rogue, and Warrior.
+- Reminder unchanged, and **now documented for Druids in the README**: Attack must sit on a bar slot the Cat/Bear form bar does not replace (a side or bottom bar), since shifting replaces your main bar.
+
+### 🏹 Fixed: Hunter now reads as usable from level 1
+- The rotation already ran at level 1 (Auto Shot, plus Raptor Strike in melee, with everything else enabling itself as it is learned), but the `starter` profile defaulted its sting to **Serpent Sting** — which a hunter does not have until level 4 — so the profile-validity check nagged "incomplete, missing Serpent Sting" on every pull and made it *look* broken.
+- Hunter profile validity is now **tolerant of not-yet-learned abilities**, the same way the Druid does not flag a not-yet-learned form. A fresh hunter reads as a clean, usable profile and simply Auto Shots until each ability (Serpent Sting L4, Hunter's Mark / Arcane Shot L6, Aspect of the Hawk L10, Steady Shot L20) trains and switches itself on. The misleading "valid from level 1" template comment was corrected to list real learn levels.
+
+### 🔢 Changed
+- Version set to **0.7.2b** across the core banner, `.toc`, README, and changelog. The core banner had been bumped to `0.8.0b` ahead of the docs; since this release is bug-fix-only it is a patch bump from 0.7.1b, not a minor.
+
+---
+
 ## v0.7.1b — Hunter Reworked for 1.18.1 & Druid Tank Pull
 
 Rebuilds the Hunter around **Turtle WoW 1.18.1's** hunter changes (the earlier

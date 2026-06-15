@@ -1,4 +1,4 @@
-# AutoRota (v0.7.1b)
+# AutoRota (v0.7.2b)
 
 AutoRota is a lightweight, robust, Configurable one-button rotation, multi class (Turtle WoW 1.12 / SuperWoW). Unlike standard "monolithic" 1.12 macros or basic script loops, AutoRota uses a modern modular architecture, automated frame-by-frame management, and smart situational logic to execute combat rotations.
 
@@ -73,7 +73,7 @@ Cat (DPS), Bear (Tank), and Balance (Caster/Moonkin) in one form-adaptive engine
 * **Bear Tanking:** *Faerie Fire (Feral)* as the **ranged opener** (instant, 30yd — starts threat + damage on the pull before the mob reaches you), optional **Growl** taunt that grabs threat on the pull and whenever the target stops attacking you (off when you already hold aggro, so solo play never wastes it), *Demoralizing Roar* upkeep, *Maul* as the rage dump, *Swipe* leading under `/ar aoe`, and optional *Enrage* when rage-starved (in combat only — it lowers armor, so it is off by default). *(Moonfire cannot be cast in bear form, so Faerie Fire is the bear's ranged opener.)*
 * **Form-Aware Auto-Attack:** The white swing is started automatically in **Cat and Bear** (and never while casting in caster/Moonkin). Note: for this to work in a form, the **Attack** ability must sit on an action-bar slot that the form bar does *not* replace (e.g. a side or bottom bar), or let *SuperCleveRoidMacros* handle attacks.
 
-### 🏹 Hunter `(Beta — Turtle 1.18.1)`
+### 🏹 Hunter `(Beta)`
 
 Reworked for Turtle WoW 1.18.1's hunter changes, with a **Ranged** and a **Melee** playstyle selectable per profile (`/ar mode ranged|melee`):
 
@@ -122,7 +122,9 @@ Because all configuration logic is handled by the visual interface and database,
 ```
 
 > #### 🗡️ Melee classes: put **Attack** on an action bar
-> For melee classes (Paladin, Rogue, Warrior), AutoRota keeps your white swing going by toggling the standard **Attack** ability — but it can only do this if that ability is on one of your action bars. Open your spellbook (**P**), find **Attack** in the *General* tab, and drag it onto any free action slot. Without it, the rotation will fire abilities but you may notice you are not auto-attacking between them.
+> For melee classes (Paladin, Rogue, Warrior, and Druid in Cat/Bear form), AutoRota keeps your white swing going by toggling the standard **Attack** ability — but it can only do this if that ability is on one of your action bars. Open your spellbook (**P**), find **Attack** in the *General* tab, and drag it onto any free action slot. Without it, the rotation will fire abilities but you may notice you are not auto-attacking between them.
+>
+> **Druids, read this:** shapeshifting into Cat or Bear form **replaces your main action bar** with the form bar, so **Attack** must sit on a bar that stays visible while shifted — the right-side vertical bars or the bottom-right bar, **not** the main bar (slots 1–12). If it is only on the main bar, you will see the rotation taunt and use abilities but the white swing will not start in form.
 >
 > *Exception:* if you run **SuperCleveRoidMacros**, AutoRota leaves auto-attack handling to SCRM and skips this step.
 

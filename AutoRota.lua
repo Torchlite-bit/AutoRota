@@ -15,7 +15,7 @@
 -- ============================================================
 
 AutoRota = {
-    ver = "0.8.0b",
+    ver = "0.7.2b",
     classes = {},     -- token -> module table
     active = nil,      -- the module for this character's class
     Loaded = false,
@@ -538,7 +538,13 @@ function AutoRota:RunRotation()
     if not UnitExists("target") or UnitIsDead("target") then TargetNearestEnemy() end
     if not UnitCanAttack("player", "target") then return end
 
-    if self.active.meleeAutoAttack ~= false and not IsAddOnLoaded("SuperCleveRoidMacros") then self:EnsureAutoAttack() end
+    -- Keep the white swing going for melee classes. This runs whether or not
+    -- SuperCleveRoidMacros is loaded: EnsureAutoAttack only toggles Attack when
+    -- you are not already swinging, so it is a no-op if SCRM (or anything else)
+    -- already started it, and it fills the gap if nothing did. meleeAutoAttack
+    -- == false (e.g. the Druid, which swings only in Cat/Bear and casts in
+    -- caster form) opts out here and manages its own swing in the module.
+    if self.active.meleeAutoAttack ~= false then self:EnsureAutoAttack() end
 
     self:SnapshotBuffs()
     self:SnapshotTargetDebuffs()
