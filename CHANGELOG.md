@@ -4,6 +4,29 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.8.0b — Hunter Reworked for 1.18.1 & Druid Tank Pull
+
+Rebuilds the Hunter around **Turtle WoW 1.18.1's** hunter changes (the earlier
+module was vanilla-1.12 based), and sharpens the Druid bear opener and
+auto-attack.
+
+### 🏹 Reworked: Hunter (Turtle 1.18.1)
+- **Two playstyles per profile**, switchable with `/ar mode ranged|melee`:
+  - **Ranged (BM / MM):** Auto Shot backbone with **Steady Shot** (baseline at 20) as the 1:1 weave, plus *Arcane Shot* / *Multi-Shot* instants. All shots are queued through SuperWoW/Nampower so the weave never clips the shot in progress.
+  - **Melee (Survival / BM-melee):** keeps **Aspect of the Wolf** up, starts melee swings, uses **Raptor Strike** on cooldown and **Mongoose Bite** reactively after a dodge, optional *Wing Clip*, and drops **Immolation Trap** on cooldown (1.18.1 allows in-combat traps).
+- **Lock and Load capstone:** *Aimed Shot* is no longer hard-cast on cooldown (it clips Auto Shot). The rotation watches for the **Lock and Load** buff and fires *Aimed Shot* the moment it procs; a per-profile toggle can re-enable cast-on-cooldown.
+- **Aspect management:** keeps Hawk (ranged) / Wolf (melee) up and can **swap to the mana aspect** below a threshold with hysteresis so it does not flap.
+- **Pet:** attack, *Mend Pet* below a slider, **Kill Command** on cooldown (BM), and an optional **Baited Shot** in the window after the pet crits.
+- New panel (mode, sting, ranged shots with the Lock-and-Load guard, AoE/Survival, melee, aspect + mana swap, pet, cooldowns) and templates: `starter`, `beastmastery`, `marksmanship`, `survival`, `melee`. New command `/ar mode`; refreshed spell aliases.
+- **Honesty note:** a few 1.18.1 names are best-effort and gated by `KnowsSpell` (so an unknown name no-ops). The mana aspect tries *Aspect of the Viper* then *Aspect of the Beast*; *Kill Command*, *Baited Shot*, and the *Lock and Load* buff name are the items to confirm with `/ar debug` if they do not fire.
+
+### 🐾 Improved: Druid bear pull & auto-attack
+- **Faerie Fire (Feral)** is the bear's **ranged opener** — instant, 30yd, threat + damage on the pull before the mob arrives. (Moonfire cannot be cast in bear form, so this is its bear analog.)
+- New optional **Growl** taunt: grabs threat on the pull and whenever the target is not focused on you, and stays quiet while you already hold aggro (so solo play never wastes it). Toggle in the Bear panel, on by default.
+- **Form-aware auto-attack:** the white swing is now started in **Cat and Bear** and no longer attempted while casting in caster/Moonkin. (Attack must be on a bar slot the form bar does not replace, or let SuperCleveRoidMacros manage it.)
+
+---
+
 ## v0.7.0b — Hunter Module & Spell-ID Debuff Detection
 
 Adds the sixth class module, **Hunter**, and replaces the addon's icon-fragment
