@@ -4,6 +4,30 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.8.0b — Shaman
+
+Adds the **Shaman** as a full mode-adaptive class module — the eighth class — built to the same standards as the rest: usable from level 1, talent-aware, and with its mechanics matched to Turtle 1.18.1. Minor version bump for a new class.
+
+### ⚡ Added: Shaman module (Enhancement / Elemental / Tank)
+- **Three modes**, switchable in the panel or with `/ar mode <enhancement|elemental|tank>`:
+  - **Enhancement** (melee): auto-attack, Stormstrike, Lightning Strike, a shock on its shared cooldown, with a Lightning Bolt weave.
+  - **Elemental** (caster): Flame Shock DoT and a Lightning Bolt filler (which builds Electrify), with Elemental Mastery on cooldown.
+  - **Tank**: Earth Shock threat on cooldown, Stormstrike for the Nature-damage self-buff, Lightning Strike, and an optional Earthshaker Slam taunt (cast only when the target isn't already on you).
+- **Works from level 1:** a fresh shaman has only *Lightning Bolt* and melee, so the Lightning Bolt filler carries the early levels and everything else — shocks, shields, Stormstrike, Lightning Strike, Searing Totem — enables itself through `KnowsSpell` as it is trained. Profile validity never flags a not-yet-learned ability.
+- **Shield & shock management:** keeps your chosen shield up (Lightning for damage/threat, Water for mana, Earth) and casts one shock on the shared cooldown — Flame Shock maintained as a DoT (name/texture detection with a blind-timer fallback), Earth/Frost on cooldown. `/ar shield` and `/ar shock` to switch.
+- **Stormstrike → shock ordering:** Turtle's Stormstrike grants a +20% Nature-damage self-buff for your next two Nature hits, so the rotation casts it before the shock to consume the buff.
+- Optional Searing Totem upkeep (timer-based, since 1.12 has no totem-state API), plus Elemental Mastery and self-Bloodlust pops. Full config panel with mode/shield/shock dropdowns and per-ability toggles.
+
+### 🌙 Talent automation
+- **Stormstrike**, **Lightning Strike**, and **Elemental Mastery** are talent-granted abilities that appear in the spellbook when talented, so `KnowsSpell` auto-includes them in the rotation when present — no scan needed.
+- **Elemental Focus** grants no spell (it's a passive crit proc — Clearcasting, making the next spell 60% cheaper), so it can't be seen via `KnowsSpell`. AutoRota reads the **talent tree** (`GetTalentInfo`, cached and refreshed on respec) to detect it and surface the Clearcasting proc in the trace — the same approach used for the Warlock's Nightfall. The discount applies to your next spell automatically; spending it specifically on Chain Lightning is a planned follow-up (no AoE/Chain Lightning option in this build yet).
+
+### 📝 Notes
+- In-game verification (flagged in the README): confirm the **Clearcasting** proc buff name, the **Stormstrike** self-buff, and the **Searing Totem** / **Earthshaker Slam** spell names with `/ar talents` and `/ar debug`. The talent name sits in one constant (`TALENT_CLEARCAST`) in `Class_Shaman.lua`.
+- Not yet covered (candidate follow-ups): AoE (Chain Lightning / Magma / Fire Nova totems), weapon-imbue automation (Rockbiter/Windfury/Flametongue/Frostbrand), and spending the Clearcasting proc on a high-mana nuke.
+
+---
+
 ## v0.7.4b — Talent-Name Fixes, Rogue Rupture & a Talent Dump
 
 A talent-tree cross-reference pass against Turtle 1.18.1, plus the tooling to verify talent and buff names in-game.

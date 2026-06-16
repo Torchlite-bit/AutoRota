@@ -1,4 +1,4 @@
-# AutoRota (v0.7.4b)
+# AutoRota (v0.8.0b)
 
 AutoRota is a lightweight, robust, Configurable one-button rotation, multi class (Turtle WoW 1.12 / SuperWoW). Unlike standard "monolithic" 1.12 macros or basic script loops, AutoRota uses a modern modular architecture, automated frame-by-frame management, and smart situational logic to execute combat rotations.
 
@@ -88,6 +88,18 @@ Reworked for Turtle WoW 1.18.1's hunter changes, with a **Ranged** and a **Melee
 * **AoE & Cooldowns:** *Volley* leads then *Multi-Shot* fills under `/ar aoe`. *Rapid Fire* and *Bestial Wrath* automate on the usual three-state model — always, elite/boss only, or off.
 
 > **Verification note:** A few 1.18.1 specifics are best-effort and gated by `KnowsSpell`, so an unknown name simply no-ops. If *Kill Command*, *Baited Shot*, the **Lock and Load** buff, or the mana aspect (tried: *Aspect of the Viper*, *Aspect of the Beast*) are not firing, run `/ar debug` and check the exact names — they drop into one place in `Class_Hunter.lua`.
+
+### ⚡ Shaman `(Beta)`
+
+Enhancement, Elemental, and Tank in one mode-adaptive engine — working from level 1:
+
+* **Mode-Adaptive Rotation:** Pick **Enhancement** (melee: auto-attack, Stormstrike, Lightning Strike, a shock, with a Lightning Bolt weave), **Elemental** (caster: Flame Shock + Lightning Bolt building Electrify), or **Tank** (Earth Shock threat, Stormstrike, Lightning Strike, optional Earthshaker Slam taunt) — panel dropdown or `/ar mode enhancement|elemental|tank`.
+* **Works from Level 1:** A fresh shaman only has *Lightning Bolt* and melee, so the Lightning Bolt filler carries the early levels and everything else — shocks, shields, Stormstrike, Lightning Strike, totems — switches itself on through `KnowsSpell` as it's trained.
+* **Talent Automation:** *Stormstrike* and *Lightning Strike* are talent abilities that appear in the spellbook when talented, so they're auto-included when learned (Stormstrike's Nature self-buff is followed by a shock to consume it). *Elemental Focus* grants **no spell** — it's a passive crit proc (Clearcasting, 60% cheaper next spell) — so AutoRota reads the **talent tree** to detect it and surface the proc, the same approach used for the Warlock's Nightfall.
+* **Shield & Shock:** Keeps your chosen shield up (*Lightning* for damage/threat, *Water* for mana) and casts one shock on the shared cooldown — *Flame Shock* maintained as a DoT, *Earth/Frost* on cooldown. Switch with `/ar shield` and `/ar shock`.
+* **Totems & Cooldowns:** Optional *Searing Totem* upkeep (timer-based), plus *Elemental Mastery* and self-*Bloodlust* pops.
+
+> **Verification note:** Buff/proc names are best-effort — confirm the **Clearcasting** proc, the **Stormstrike** self-buff, and the **Searing Totem** / **Earthshaker Slam** spell names in-game with `/ar talents` and `/ar debug` if anything isn't firing; the talent name sits in one constant in `Class_Shaman.lua`.
 
 ---
 
