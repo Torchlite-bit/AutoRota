@@ -5,8 +5,9 @@
 -- Turtle 1.18.1 reshaped the hunter heavily, so this module is built around
 -- the live playstyles rather than vanilla:
 --  * RANGED (BM / MM): Auto Shot is the damage backbone. Steady Shot (now
---    baseline at 20) weaves 1:1 after each Auto Shot - it is swing-gated so
---    mashing it cannot chain casts and starve Auto Shot - with Arcane Shot and
+--    baseline at 20) weaves 1:1 after each Auto Shot - it is gated on the exact
+--    Auto Shot timing from SuperWoW's UNIT_CASTEVENT (with an interval fallback)
+--    so mashing it cannot chain casts and starve Auto Shot - with Arcane Shot and
 --    Multi-Shot weaved as instants. Aimed Shot is NOT pressed on cooldown
 --    (it clips Auto Shot) - it is only fired when the Marksmanship capstone
 --    "Lock and Load" procs (crit from Steady/Aimed/Arcane resets Aimed Shot,
@@ -37,6 +38,10 @@ local MEND_PET_CD = 12   -- Mend Pet HoT lasts ~15s, refresh a little early
 local REACT_WINDOW = 5.0 -- Mongoose Bite stays usable ~5s after a dodge
 local PETCRIT_WINDOW = 4.0
 local MANA_ASPECT_HYST = 15   -- swap back to the combat aspect this far above the low mark
+-- Steady Shot weave margin: it must finish this far before the next Auto Shot
+-- launches to clear the ~0.5s shot windup plus latency, so it never clips.
+local STEADY_BUFFER = 0.5
+local STEADY_CAST_DEFAULT = 1.5   -- assumed Steady Shot cast time until measured live
 
 -- The mana-regenerating aspect (Turtle). First known name is used; gated by
 -- KnowsSpell so an unknown name is simply inert.
@@ -244,13 +249,29 @@ end
 
 -- Steady Shot weave gate. Steady Shot has a cast time and, with Nampower,
 -- casting it pauses the Auto Shot swing; firing it on every press chains Steady
--- Shots back to back and starves Auto Shot entirely. We let one Steady Shot
--- through per ranged-swing cycle and lock it out for the rest of that cycle, so
--- Auto Shot always has a clear window to fire. The result is the intended 1:1
--- weave (Steady, gap-with-Auto-Shot, Steady, ...) instead of a Steady chain.
--- steadyT is the time of the last Steady Shot; it is reset on leaving combat.
+-- Shots back to back and starves Auto Shot entirely.
+--
+-- Precise path (SuperWoW): the UNIT_CASTEVENT hook records the exact moment each
+-- Auto Shot launches (self.lastAutoShot) and Steady Shot's real, haste-adjusted
+-- cast time (self.steadyCastDur). We then weave Steady only when it will finish,
+-- with margin for the shot windup, before the next Auto Shot launches. This is
+-- frame-accurate: weave right after a shot, then hold for the next one.
+--
+-- Fallback path (no event seen yet, e.g. SuperWoW absent): a self-throttle that
+-- lets one Steady Shot through per ranged-swing cycle. steadyT is reset on
+-- leaving combat.
 function M:SteadyReady()
+    if self.lastAutoShot and self.lastAutoShot > 0 then
+        local cast = (self.steadyCastDur and self.steadyCastDur > 0) and self.steadyCastDur or STEADY_CAST_DEFAULT
+        local nextAuto = self.lastAutoShot + self:RangedSpeed()
+        return (nextAuto - GetTime()) >= (cast + STEADY_BUFFER)
+    end
     return (GetTime() - (self.steadyT or 0)) >= self:RangedSpeed()
+end
+
+-- Which weave path is live, for the trace line.
+function M:WeaveSource()
+    return (self.lastAutoShot and self.lastAutoShot > 0) and "precise" or "interval"
 end
 
 -- ============================================================
@@ -332,7 +353,7 @@ function M:Rotate(cfg)
             .. " mark=" .. (cfg.useHuntersMark and (self:TargetDebuffUp("Hunter's Mark", nil) and "Y" or "n") or "-")
             .. " L&L=" .. (self:HasBuff("Lock and Load") and "Y" or "n")
             .. " auto=" .. (self:AutoShotting() and "Y" or (self.autoShotOn and "assumed" or "N"))
-            .. " steady=" .. (cfg.useSteadyShot and (self:SteadyReady() and "ready" or "wait") or "-")
+            .. " steady=" .. (cfg.useSteadyShot and (self:SteadyReady() and "ready" or "wait") .. "/" .. self:WeaveSource() or "-")
             .. " manaAsp=" .. (self.manaAspectActive and "Y" or "n")
             .. " mongoose=" .. ((now < (self.dodgeUntil or 0)) and "Y" or "n")
             .. " elite=" .. (isElite and "Y" or "N"))
@@ -525,18 +546,22 @@ function M:HandleCommand(cmd, t)
 end
 
 -- ============================================================
--- Event tracking: Auto Shot reset on leaving combat, the Mongoose Bite dodge
--- window (we dodged an enemy attack), and the pet-crit window for Baited Shot.
+-- Event tracking: precise Auto Shot / Steady Shot timing from SuperWoW's
+-- UNIT_CASTEVENT (arg1 casterGUID, arg3 type, arg4 spell id, arg5 cast ms),
+-- the Auto Shot reset on leaving combat, the Mongoose Bite dodge window, and
+-- the pet-crit window for Baited Shot.
 -- ============================================================
 local hunterFrame = CreateFrame("Frame")
 hunterFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 hunterFrame:RegisterEvent("CHAT_MSG_COMBAT_CREATURE_VS_SELF_MISSES")  -- enemy attacks we avoided
 hunterFrame:RegisterEvent("CHAT_MSG_COMBAT_PET_HITS")                 -- our pet's damage
+hunterFrame:RegisterEvent("UNIT_CASTEVENT")                           -- SuperWoW: exact cast/shot timing
 hunterFrame:SetScript("OnEvent", function()
     if event == "PLAYER_REGEN_ENABLED" then
         M.autoShotOn = false
         M.autoShotTarget = nil
         M.steadyT = 0
+        M.lastAutoShot = 0   -- forget the ranged-swing phase between pulls
     elseif event == "CHAT_MSG_COMBAT_CREATURE_VS_SELF_MISSES" then
         if arg1 and string.find(string.lower(arg1), "dodge") then
             M.dodgeUntil = GetTime() + REACT_WINDOW
@@ -544,6 +569,23 @@ hunterFrame:SetScript("OnEvent", function()
     elseif event == "CHAT_MSG_COMBAT_PET_HITS" then
         if arg1 and string.find(string.lower(arg1), "crit") then
             M.petCritUntil = GetTime() + PETCRIT_WINDOW
+        end
+    elseif event == "UNIT_CASTEVENT" then
+        -- Only the player's own casts matter; filter by GUID before the spell
+        -- lookup to stay cheap when many units are casting nearby.
+        if not M.playerGUID then local _, g = UnitExists("player"); M.playerGUID = g end
+        if arg1 and M.playerGUID and arg1 == M.playerGUID and SpellInfo then
+            local nm = SpellInfo(arg4)
+            if nm == "Auto Shot" then
+                -- "CAST" is the projectile launch (the swing reset); ignore the
+                -- "START" windup so the phase reference is the actual shot.
+                if arg3 == "CAST" then M.lastAutoShot = GetTime() end
+            elseif nm == "Steady Shot" then
+                if arg3 == "START" then
+                    local d = tonumber(arg5)
+                    if d and d > 0 then M.steadyCastDur = d / 1000 end
+                end
+            end
         end
     end
 end)
