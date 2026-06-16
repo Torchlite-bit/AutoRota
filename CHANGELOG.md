@@ -4,7 +4,30 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
-## v0.7.2b — Stability Pass: Druid Swing & Hunter Leveling
+## v0.7.3b — Warlock Toolkit & Talent-Aware Nightfall
+
+Expands the Warlock from a DoT-and-filler loop into a full survival / execute /
+pet kit, and adds the project's first **talent-tree read** for rotation logic.
+
+### 🔮 Added: Warlock survival, execute, and pet tools
+Each is optional, gated by `KnowsSpell`, and slots into the rotation by priority (survival → execute → DoTs → Life Tap → filler):
+- **Drain Life self-heal** — channels Drain Life when your health drops below a set percent (the drain-tank safety net). Highest priority, because staying alive comes first.
+- **Health Funnel** — tops the pet when it drops below a threshold, but only while your *own* health stays above a floor (it transfers your health to the pet).
+- **Shadowburn execute** — instant finish under an execute percent (costs a Soul Shard, respects its cooldown).
+- **Drain Soul finisher** — channels in the target's last seconds to bank a Soul Shard and regen mana. If both Shadowburn and Drain Soul are enabled, Shadowburn fires first when ready and Drain Soul fills otherwise.
+- New **Execute** and **Survival** sections in the config panel with per-feature toggles and percent sliders; the `starter` template enables Drain Life + Health Funnel + Drain Soul for leveling, and `destruction` enables Shadowburn.
+
+### 🌙 Added: talent-aware Nightfall (the talent-scan question)
+- The rotation now reads the **talent tree** (`GetTalentInfo`, cached like the paladin) to detect **Nightfall**, and **auto-enables the free-instant-Shadow-Bolt reaction** when the talent is present — no manual toggle needed. The toggle remains as a manual override.
+- Why a talent read here specifically: Nightfall grants no spell, so `KnowsSpell` cannot see it — same situation as the paladin's Holy Might (Holy Strike exists, but only the talent makes it apply the buff). **Most warlock talent abilities do *not* need a talent scan** — Shadowburn, Conflagrate, Siphon Life, and Drain Soul all appear in the spellbook only when talented, so `KnowsSpell` already detects them. Only proc-style passives like Nightfall need the tree read.
+- Added the matching **talent-cache invalidation** (cleared at login and on `CHARACTER_POINTS_CHANGED`) so a respec into or out of Nightfall is picked up.
+
+### 🩹 Fixed
+- Filler dropdown and rotation already fall back to Shadow Bolt for a level 1 warlock (carried from 0.7.2b); this release builds the survival/execute kit on top so a leveling warlock drain-tanks and banks shards out of the box.
+
+---
+
+## v0.7.2b — Stability Pass: Druid Swing, Hunter & Warlock Leveling
 
 A correctness release from a full project review. No new features — two
 targeted bug fixes and a version cleanup (the core banner had jumped ahead to
@@ -19,6 +42,11 @@ targeted bug fixes and a version cleanup (the core banner had jumped ahead to
 ### 🏹 Fixed: Hunter now reads as usable from level 1
 - The rotation already ran at level 1 (Auto Shot, plus Raptor Strike in melee, with everything else enabling itself as it is learned), but the `starter` profile defaulted its sting to **Serpent Sting** — which a hunter does not have until level 4 — so the profile-validity check nagged "incomplete, missing Serpent Sting" on every pull and made it *look* broken.
 - Hunter profile validity is now **tolerant of not-yet-learned abilities**, the same way the Druid does not flag a not-yet-learned form. A fresh hunter reads as a clean, usable profile and simply Auto Shots until each ability (Serpent Sting L4, Hunter's Mark / Arcane Shot L6, Aspect of the Hawk L10, Steady Shot L20) trains and switches itself on. The misleading "valid from level 1" template comment was corrected to list real learn levels.
+
+### 🔮 Fixed: Warlock now works from level 1
+- A fresh warlock's only damage spell is **Shadow Bolt**, but the `starter` profile's filler is the **wand** (`Shoot`) — and a level 1 warlock has no wand. The DoT loop skipped every not-yet-learned effect, the wand filler did nothing without a wand, and **Shadow Bolt was never reached**, so the rotation cast nothing useful while leveling.
+- The filler now **adapts** (`ResolveFiller`): the wand filler falls back to **Shadow Bolt** when no wand is equipped, and a spell filler that is not learned yet also falls back to Shadow Bolt. The moment a wand is equipped it is used again automatically — no settings change — preserving the mana-efficient drain-tank leveling style while never leaving a low-level warlock idle.
+- Profile validity is now **tolerant of not-yet-learned abilities** (same as the hunter and druid), so the leveling profile no longer nags about Immolate / Corruption / Curse of Agony before they are trained.
 
 ### 🔢 Changed
 - Version set to **0.7.2b** across the core banner, `.toc`, README, and changelog. The core banner had been bumped to `0.8.0b` ahead of the docs; since this release is bug-fix-only it is a patch bump from 0.7.1b, not a minor.

@@ -164,6 +164,17 @@ function AutoRotaUI:BindCheck(item, on, spellName)
     end
 end
 
+-- Enable or grey out a slider in one call (mouse + alpha), so callers do not
+-- repeat the EnableMouse/SetAlpha pair. Used by the class config bodies to
+-- follow a checkbox's on/off and learned state.
+function AutoRotaUI:SliderEnable(slider, on)
+    if on then
+        slider:EnableMouse(true);  slider:SetAlpha(1)
+    else
+        slider:EnableMouse(false); slider:SetAlpha(0.35)
+    end
+end
+
 -- ------------------------------------------------------------
 -- slider (Blizzard template). opts = {min,max,step,suffix}.
 -- For compatibility the 4th argument may be the onChange function,

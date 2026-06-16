@@ -1,4 +1,4 @@
-# AutoRota (v0.7.2b)
+# AutoRota (v0.7.3b)
 
 AutoRota is a lightweight, robust, Configurable one-button rotation, multi class (Turtle WoW 1.12 / SuperWoW). Unlike standard "monolithic" 1.12 macros or basic script loops, AutoRota uses a modern modular architecture, automated frame-by-frame management, and smart situational logic to execute combat rotations.
 
@@ -50,12 +50,14 @@ A roleless, toggle-driven engine covering Arms, Fury, and Protection from early 
 
 ### 🔮 Warlock `(Beta)`
 
-Optimized for efficient DoT upkeep and resource management:
+A full DoT, survival, execute, and pet kit — working from level 1:
 
-* **DoT Priority Engine:** Keeps your enabled damage-over-time effects up in strict priority — *Immolate*, then your chosen Curse, then *Corruption*, then *Siphon Life* — detected by exact spell name (SuperWoW spell ids, with texture fallback), with a per-target landing memory so cast-time DoTs are never double-queued while still in the air. Every curse is now tracked precisely, not just the ones with a hand-verified icon.
+* **DoT Priority Engine:** Keeps your enabled damage-over-time effects up in strict priority — *Immolate*, then your chosen Curse, then *Corruption*, then *Siphon Life* — detected by exact spell name (SuperWoW spell ids, with texture fallback), with a per-target landing memory so cast-time DoTs are never double-queued while still in the air.
+* **Works from Level 1:** A fresh warlock's only damage is *Shadow Bolt*, so the filler **adapts** — the wand filler falls back to Shadow Bolt when no wand is equipped (and a not-yet-learned spell filler does too), then uses the wand automatically the moment you equip one. The DoTs and curse switch themselves on as they are trained.
+* **Survival & Execute (each optional, by priority):** *Drain Life* self-heals when your health dips (drain-tank safety net); *Health Funnel* tops the pet when it drops, as long as your own health is safe; *Shadowburn* instant-executes under a threshold; *Drain Soul* channels in the target's last seconds to bank a Soul Shard. Toggles and percent sliders live in the panel's **Survival** and **Execute** sections.
+* **Talent-Aware Nightfall:** AutoRota reads your **talent tree** to detect *Nightfall* and **auto-fires the free instant *Shadow Bolt*** the moment *Shadow Trance* procs — no toggle needed (it stays as a manual override). Other talented abilities don't need this: *Shadowburn*, *Conflagrate*, *Siphon Life*, and *Drain Soul* appear in your spellbook only when talented, so they're detected for free.
 * **Curse Selection:** One curse per target, switchable from the panel or mid-fight with `/ar curse <alias>` (`coa`, `coe`, `cos`, `cow`, `cor`, `cot`, `cod`, `none`).
-* **Life Tap Integration:** Hysteresis-style management that triggers *Life Tap* only when mana dips below your threshold **and** health is safely above your floor.
-* **Configurable Filler:** When every enabled DoT is up — wand (mana-free), *Shadow Bolt*, or *Drain Life*. A *Nightfall* option fires the free instant *Shadow Bolt* the moment *Shadow Trance* procs.
+* **Life Tap Integration:** Triggers *Life Tap* only when mana dips below your threshold **and** health is safely above your floor.
 * **Cast Queueing & Pet Support:** Cast-time spells use SuperWoW's `QueueSpellByName` so the rotation never clips a cast (with a smart exception while wanding, where a direct cast fires immediately). Optionally sends your pet onto the target every press.
 
 ### 🐾 Druid `(Beta)`
