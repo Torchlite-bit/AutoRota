@@ -2,37 +2,30 @@
 
 **Smart, Modular Combat Automation for Turtle WoW (1.18.1)**
 
-## Overview 🛡️
+## 🛡️ Overview 🛡️
 AutoRota is a lightweight, robust, and highly configurable combat rotation assistant designed specifically for the Turtle WoW 1.18.1 client. Moving beyond the limitations of standard 1.12 "monolithic" macros or basic script loops, AutoRota utilizes a modern, modular architecture. It leverages automated frame-by-frame management and smart, situational logic to execute precise combat sequences tailored to your class and specialization.
 
-## Key Features 🚀
-- **Modular Design**: Each class utilizes a specific, optimized module, allowing for cleaner code and specialized handling of Turtle WoW’s unique talents and abilities.
-- **Frame-by-Frame Execution**: Unlike simple macro sequences, AutoRota monitors combat state frame-by-frame, ensuring ability execution is prioritized based on real-time triggers rather than static delays.
-- **Smart Situational Logic**: Beyond just a basic rotation, the addon evaluates current combat conditions—such as mana levels, debuff windows, and proc availability—to make intelligent decisions on the fly.
-- **Configurable & Lightweight**: Designed with performance in mind, AutoRota provides a responsive experience without the "bloat" of traditional raid-management tools, while allowing users to fine-tune rotation priorities.
-- **Turtle WoW Integration**: Fully aware of custom balance changes and new abilities added in the 1.18.1 patch, ensuring your rotations reflect the current Turtle WoW meta rather than vanilla defaults.
+Whether you are leveling through the world or pushing endgame raids, AutoRota removes the guesswork from your rotation. By delegating the complexities of ability timing to our frame-perfect execution engine, you can focus on movement, positioning, and tactical awareness, confident that your optimal rotation is running flawlessly in the background
 
-## ⚠️ Important Beta Notice
+
+## ⚠️ Important Beta Notice ⚠️
 AutoRota is currently in an **active beta state**. As such, the addon is subject to potential errors in both rotation logic and general functionality. We recommend that users monitor combat closely during use, particularly in high-stakes environments like dungeons or raids. Your feedback is instrumental in refining our modular logic and improving the addon's stability as we continue development.
 
-## Why AutoRota?
-Whether you are leveling through the world or pushing endgame raids, AutoRota removes the guesswork from your rotation. By delegating the complexities of ability timing to our frame-perfect execution engine, you can focus on movement, positioning, and tactical awareness, confident that your optimal rotation is running flawlessly in the background.
+---
+
+## 🖥️ Key Features 
+
+- **Modular, Lightweight Architecture:** A unified, low-overhead UI shell dynamically loads specialized class modules, ensuring your rotation is optimized for your specific class and talent setup without "bloat".
+- **Frame-Perfect Execution:** Designed for the Turtle WoW / SuperWoW environment, the addon monitors combat frame-by-frame. Using strict single-cast priorities and zero-clipping logic, it ensures only one primary action executes per frame to prevent GCD overlap.
+- **Intelligent Situational Logic:** Beyond static loops, AutoRota evaluates real-time combat conditions—such as mana, proc availability, and debuff windows—to make smart, fly-by decisions.
+- **Turtle WoW & SuperWoW Optimized:** Fully compatible with custom 1.18.1 mechanics, including spell queueing (`QueueSpellByName`), weapon swing timing, and custom class expansions.
+- **Locale-Proof Debuff Resolution:** Target debuffs are resolved via precise SuperWoW spell IDs, ensuring upkeep is rank- and locale-proof. Clients without SuperWoW automatically fallback to icon-texture matching.
+- **High-Performance Per-Press:** By caching spellbook lookups and snapshots, the addon replaces heavy scanning with high-speed table reads, ensuring responsiveness even during button spam.
+- **User-Centric Configuration:** Includes draggable minimap button control (`/armap`), an intuitive configuration panel, and robust profile management to seamlessly switch between *Leveling*, *PvP*, or *Raid* presets.
 
 ---
 
-## 🖥️ Features
-
-- **Multi-Class Architecture:** A unified, lightweight UI shell dynamically swaps control panels and rotation rules based on the class you are currently playing.
-- **Smart Profile Management:** Create, save, rename, and activate multiple custom setup profiles (e.g., *Starter*, *Leveling*, *PvP*, *Raid-DPS*) seamlessly in-game.
-- **Turtle WoW & SuperWoW Optimized:** Fully compatible with custom SuperWoW features such as spell queueing (`QueueSpellByName`), weapon swing timing, and custom custom class expansions (e.g., Rogue's *Noxious Assault*, Paladin's *Holy Strike*).
-- **Exact Debuff Detection:** Target debuffs are resolved to their precise spell name via SuperWoW spell ids (built once per press in the core), so upkeep is rank- and locale-proof for every class. Clients without SuperWoW fall back automatically to icon-texture matching.
-- **Zero-Clipping Logic:** Rotations run on strict single-cast priorities with early returns. The addon ensures exactly one primary action executes per frame to prevent spell clipping or overlapping global cooldowns (GCD).
-- **Lightweight Per-Press Cost:** Spellbook lookups, profile validity, the auto-attack button, player buffs, and target debuffs are all cached or snapshotted (and refreshed automatically when you learn spells or edit profiles), so spamming the macro costs a handful of table reads instead of repeated full spellbook, action-bar, buff, and debuff scans.
-- **Minimap Button:** A draggable minimap button opens the configuration panel with a click (right-click runs the rotation once). Hide or show it with `/armap`.
-
----
-
-## ⚠️ Included Class Modules (WiP)
+## ⚠️ Included Class Modules (WiP) ⚠️
 
 ### 🛡️ Paladin `(Beta)`
 Engineered around an intelligent "Roleless Seal Model" optimized for low-level leveling up to high-tier raiding:
