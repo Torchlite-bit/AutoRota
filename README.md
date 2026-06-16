@@ -1,8 +1,22 @@
-# AutoRota (v0.8.1b)
+# AutoRota ⚔️ (v0.8.1b)
 
-AutoRota is a lightweight, robust, Configurable one-button rotation, multi class (Turtle WoW 1.12 / SuperWoW). Unlike standard "monolithic" 1.12 macros or basic script loops, AutoRota uses a modern modular architecture, automated frame-by-frame management, and smart situational logic to execute combat rotations.
+**Smart, Modular Combat Automation for Turtle WoW (1.18.1)**
 
-Version 0.4 introduces a complete graphical configuration panel and database system, moving configuration options out of your macros and into a clean visual window.
+## Overview 🛡️
+AutoRota is a lightweight, robust, and highly configurable combat rotation assistant designed specifically for the Turtle WoW 1.18.1 client. Moving beyond the limitations of standard 1.12 "monolithic" macros or basic script loops, AutoRota utilizes a modern, modular architecture. It leverages automated frame-by-frame management and smart, situational logic to execute precise combat sequences tailored to your class and specialization.
+
+## Key Features 🚀
+- **Modular Design**: Each class utilizes a specific, optimized module, allowing for cleaner code and specialized handling of Turtle WoW’s unique talents and abilities.
+- **Frame-by-Frame Execution**: Unlike simple macro sequences, AutoRota monitors combat state frame-by-frame, ensuring ability execution is prioritized based on real-time triggers rather than static delays.
+- **Smart Situational Logic**: Beyond just a basic rotation, the addon evaluates current combat conditions—such as mana levels, debuff windows, and proc availability—to make intelligent decisions on the fly.
+- **Configurable & Lightweight**: Designed with performance in mind, AutoRota provides a responsive experience without the "bloat" of traditional raid-management tools, while allowing users to fine-tune rotation priorities.
+- **Turtle WoW Integration**: Fully aware of custom balance changes and new abilities added in the 1.18.1 patch, ensuring your rotations reflect the current Turtle WoW meta rather than vanilla defaults.
+
+## ⚠️ Important Beta Notice
+AutoRota is currently in an **active beta state**. As such, the addon is subject to potential errors in both rotation logic and general functionality. We recommend that users monitor combat closely during use, particularly in high-stakes environments like dungeons or raids. Your feedback is instrumental in refining our modular logic and improving the addon's stability as we continue development.
+
+## Why AutoRota?
+Whether you are leveling through the world or pushing endgame raids, AutoRota removes the guesswork from your rotation. By delegating the complexities of ability timing to our frame-perfect execution engine, you can focus on movement, positioning, and tactical awareness, confident that your optimal rotation is running flawlessly in the background.
 
 ---
 
