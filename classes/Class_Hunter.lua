@@ -5,7 +5,8 @@
 -- Turtle 1.18.1 reshaped the hunter heavily, so this module is built around
 -- the live playstyles rather than vanilla:
 --  * RANGED (BM / MM): Auto Shot is the damage backbone. Steady Shot (now
---    baseline at 20) weaves 1:1 after each Auto Shot, with Arcane Shot and
+--    baseline at 20) weaves 1:1 after each Auto Shot - it is swing-gated so
+--    mashing it cannot chain casts and starve Auto Shot - with Arcane Shot and
 --    Multi-Shot weaved as instants. Aimed Shot is NOT pressed on cooldown
 --    (it clips Auto Shot) - it is only fired when the Marksmanship capstone
 --    "Lock and Load" procs (crit from Steady/Aimed/Arcane resets Aimed Shot,
@@ -233,6 +234,25 @@ function M:Queue(name)
     return true
 end
 
+-- Auto Shot fires on the ranged swing timer; UnitRangedDamage's first return is
+-- that interval and already includes ranged haste.
+function M:RangedSpeed()
+    local s = UnitRangedDamage and UnitRangedDamage("player")
+    if s and s > 0 then return s end
+    return 2.8   -- sane fallback if the API is unavailable
+end
+
+-- Steady Shot weave gate. Steady Shot has a cast time and, with Nampower,
+-- casting it pauses the Auto Shot swing; firing it on every press chains Steady
+-- Shots back to back and starves Auto Shot entirely. We let one Steady Shot
+-- through per ranged-swing cycle and lock it out for the rest of that cycle, so
+-- Auto Shot always has a clear window to fire. The result is the intended 1:1
+-- weave (Steady, gap-with-Auto-Shot, Steady, ...) instead of a Steady chain.
+-- steadyT is the time of the last Steady Shot; it is reset on leaving combat.
+function M:SteadyReady()
+    return (GetTime() - (self.steadyT or 0)) >= self:RangedSpeed()
+end
+
 -- ============================================================
 -- Debuff upkeep helper. Returns true if a cast was issued this press.
 -- Detection prefers the exact spell name (SuperWoW), with a per-target
@@ -312,6 +332,7 @@ function M:Rotate(cfg)
             .. " mark=" .. (cfg.useHuntersMark and (self:TargetDebuffUp("Hunter's Mark", nil) and "Y" or "n") or "-")
             .. " L&L=" .. (self:HasBuff("Lock and Load") and "Y" or "n")
             .. " auto=" .. (self:AutoShotting() and "Y" or (self.autoShotOn and "assumed" or "N"))
+            .. " steady=" .. (cfg.useSteadyShot and (self:SteadyReady() and "ready" or "wait") or "-")
             .. " manaAsp=" .. (self.manaAspectActive and "Y" or "n")
             .. " mongoose=" .. ((now < (self.dodgeUntil or 0)) and "Y" or "n")
             .. " elite=" .. (isElite and "Y" or "N"))
@@ -432,9 +453,10 @@ function M:Rotate(cfg)
         if self:Queue("Aimed Shot") then return end
     end
 
-    -- Steady Shot, the 1:1 weave / primary filler after each Auto Shot.
-    if cfg.useSteadyShot and self:KnowsSpell("Steady Shot") then
-        if self:Queue("Steady Shot") then return end
+    -- Steady Shot, the 1:1 weave after each Auto Shot. Swing-gated so it never
+    -- chains back to back and clips/starves Auto Shot when the macro is mashed.
+    if cfg.useSteadyShot and self:KnowsSpell("Steady Shot") and self:SteadyReady() then
+        if self:Queue("Steady Shot") then self.steadyT = GetTime(); return end
     end
 end
 
@@ -514,6 +536,7 @@ hunterFrame:SetScript("OnEvent", function()
     if event == "PLAYER_REGEN_ENABLED" then
         M.autoShotOn = false
         M.autoShotTarget = nil
+        M.steadyT = 0
     elseif event == "CHAT_MSG_COMBAT_CREATURE_VS_SELF_MISSES" then
         if arg1 and string.find(string.lower(arg1), "dodge") then
             M.dodgeUntil = GetTime() + REACT_WINDOW
