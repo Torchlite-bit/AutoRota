@@ -30,6 +30,7 @@ local M = AutoRota:NewClassModule("HUNTER")
 M.uiTitle = "Hunter"
 M.uiHeight = 800
 M.meleeAutoAttack = false   -- managed here: Auto Shot (ranged) or Attack (melee)
+M.autoAcquireTarget = false -- a ranged class should not auto-pull random mobs; pick targets
 
 -- Chat output is shared in the core; this shim keeps call sites unchanged.
 local function msgOut(text, r, g, b) AutoRota:Msg(text, r, g, b) end
@@ -42,6 +43,9 @@ local MANA_ASPECT_HYST = 15   -- swap back to the combat aspect this far above t
 -- launches to clear the ~0.5s shot windup plus latency, so it never clips.
 local STEADY_BUFFER = 0.5
 local STEADY_CAST_DEFAULT = 1.5   -- assumed Steady Shot cast time until measured live
+-- Auto Shot is considered stalled if no shot has fired for the ranged swing plus
+-- this margin (covers a Steady Shot pause); then we restart it automatically.
+local AUTOSHOT_STALL = 2.0
 
 -- The mana-regenerating aspect (Turtle). First known name is used; gated by
 -- KnowsSpell so an unknown name is simply inert.
@@ -59,6 +63,7 @@ local STING_DUR = {
 M.modeAlias = {
     ranged = "ranged", range = "ranged", ["r"] = "ranged",
     melee = "melee", ["m"] = "melee",
+    auto = "auto", ["a"] = "auto", distance = "auto", dist = "auto",
 }
 
 M.stingAlias = {
@@ -89,8 +94,10 @@ M.spellAlias = {
 M.templates = {
     starter = {  -- usable from level 1: Auto Shot now, the rest auto-enable as
                  -- they are learned (Serpent Sting L4, Hunter's Mark/Arcane L6,
-                 -- Aspect of the Hawk L10, Steady Shot L20)
-        mode = "ranged",
+                 -- Aspect of the Hawk L10, Steady Shot L20). Auto mode picks
+                 -- ranged vs melee by distance, which suits low-level pulls where
+                 -- mobs close fast and you weave melee between shots.
+        mode = "auto",
         useHuntersMark = true, sting = "Serpent Sting",
         useSteadyShot = true, useArcaneShot = true, useMultiShot = false,
         useAimedShot = false, aimedOnlyOnProc = true,
@@ -167,13 +174,14 @@ function M:NormalizeProfile(c)
         useAspect = true, rangedAspect = "Aspect of the Hawk",
         useManaAspect = false, manaAspectPct = 30,
         petAttack = true, useMendPet = true, mendPetHp = 50,
+        petTaunt = false,
         useKillCommand = false, useBaitedShot = false,
         popCDs = false, autoCDElite = false,
     }
     for k, v in pairs(b) do
         if c[k] == nil then c[k] = v end
     end
-    if c.mode ~= "ranged" and c.mode ~= "melee" then c.mode = "ranged" end
+    if c.mode ~= "ranged" and c.mode ~= "melee" and c.mode ~= "auto" then c.mode = "ranged" end
     if type(c.sting) ~= "string" then c.sting = "Serpent Sting" end
     if type(c.rangedAspect) ~= "string" then c.rangedAspect = "Aspect of the Hawk" end
     -- migrate the old ranged-only schema (useArcaneShot etc. carried over)
@@ -222,13 +230,34 @@ function M:AutoShotting()
     return false
 end
 
+-- Returns true if it issued an Auto Shot cast this press, so the caller can make
+-- that the press's action (vanilla will not also land a GCD cast in the same
+-- frame - this is why Hunter's Mark used to lose to a same-press Auto Shot).
+-- Stall handling: with SuperWoW we know the exact last-shot time, so a shot seen
+-- within the last swing-and-a-bit means it is still firing; a stale time means it
+-- stalled and we restart it. Without event data we fall back to an assume-on flag
+-- that re-pokes periodically, so it can never get permanently stuck needing a
+-- manual target swap (the old bug).
 function M:EnsureAutoShot()
-    if self:AutoShotting() then self.autoShotOn = true; return end
-    local id = self:TargetId()
-    if self.autoShotOn and self.autoShotTarget == id then return end
+    if self:AutoShotting() then self.autoShotOn = true; self.autoShotT = GetTime(); return false end
+    local now = GetTime()
+    if self.lastAutoShot and self.lastAutoShot > 0 then
+        if (now - self.lastAutoShot) < (self:RangedSpeed() + AUTOSHOT_STALL) then
+            self.autoShotOn = true
+            return false
+        end
+    else
+        local id = self:TargetId()
+        if self.autoShotOn and self.autoShotTarget == id
+            and (now - (self.autoShotT or 0)) < (self:RangedSpeed() + AUTOSHOT_STALL) then
+            return false
+        end
+    end
     CastSpellByName("Auto Shot")
     self.autoShotOn = true
-    self.autoShotTarget = id
+    self.autoShotTarget = self:TargetId()
+    self.autoShotT = now
+    return true
 end
 
 -- Queue a shot through SuperWoW/Nampower so the weave lands without clipping
@@ -301,6 +330,54 @@ function M:PetHPPct()
     return 100
 end
 
+-- ============================================================
+-- Auto mode: pick ranged vs melee by distance to the target. InMeleeRange uses
+-- CheckInteractDistance (~10yd), the closest proxy vanilla offers. A short
+-- "stickiness" keeps us in melee for a beat after the last in-range reading so
+-- the mode does not flicker when the target jitters at the boundary.
+-- ============================================================
+function M:AutoMelee()
+    local now = GetTime()
+    if self:InMeleeRange() then
+        self.meleeStickUntil = now + 0.75
+        return true
+    end
+    return now < (self.meleeStickUntil or 0)
+end
+
+-- ============================================================
+-- Smart pet taunt. If the target is hitting the player (or someone other than
+-- the pet), the pet has lost aggro; command its Growl to pull it back. Pet
+-- abilities live on the pet action bar, so we scan for Growl, cache the slot,
+-- and cast it - throttled, since Growl has its own cooldown.
+-- ============================================================
+function M:PetLostAggro()
+    if not UnitExists("pet") then return false end
+    if not UnitExists("targettarget") then return false end
+    return UnitIsUnit("targettarget", "player")
+end
+
+function M:PetGrowlSlot()
+    local slot = self.petGrowlSlot
+    if slot then
+        local nm = GetPetActionInfo(slot)
+        if nm == "Growl" then return slot end
+    end
+    for i = 1, 10 do
+        if GetPetActionInfo(i) == "Growl" then self.petGrowlSlot = i; return i end
+    end
+    return nil
+end
+
+function M:PetGrowl()
+    local now = GetTime()
+    if (now - (self.petGrowlT or 0)) < 2.0 then return end   -- throttle, Growl has a CD
+    local slot = self:PetGrowlSlot()
+    if not slot then return end
+    CastPetAction(slot)
+    self.petGrowlT = now
+end
+
 -- Mana aspect hysteresis: drop to the mana aspect below the low mark, swap
 -- back to the combat aspect once mana climbs a buffer above it.
 function M:UpdateAspectState(cfg)
@@ -342,13 +419,19 @@ function M:Rotate(cfg)
     local isElite  = (cls == "worldboss" or cls == "elite" or cls == "rareelite")
     local aoe      = cfg.aoeMode and true or false
     local inCombat = UnitAffectingCombat("player")
-    local inMelee  = self:InMeleeRange()
-    local melee    = (cfg.mode == "melee")
+    -- Effective range state. "auto" picks ranged vs melee by distance each press
+    -- (so abilities only fire in the matching state); otherwise honor the choice.
+    local melee
+    if cfg.mode == "auto" then
+        melee = self:AutoMelee()
+    else
+        melee = (cfg.mode == "melee")
+    end
 
     self:UpdateAspectState(cfg)
 
     if self.trace then
-        self:Trace("mode=" .. (cfg.mode or "ranged")
+        self:Trace("mode=" .. (cfg.mode or "ranged") .. (cfg.mode == "auto" and ("/" .. (melee and "melee" or "ranged")) or "")
             .. " sting=" .. (cfg.sting ~= "" and cfg.sting or "-")
             .. " mark=" .. (cfg.useHuntersMark and (self:TargetDebuffUp("Hunter's Mark", nil) and "Y" or "n") or "-")
             .. " L&L=" .. (self:HasBuff("Lock and Load") and "Y" or "n")
@@ -363,6 +446,10 @@ function M:Rotate(cfg)
     -- 0. Off-GCD / fire-and-continue layer
     -- ----------------------------------------------------------------
     if cfg.petAttack and UnitExists("pet") then PetAttack() end
+
+    -- Smart pet taunt (opt-in): if the mob peels onto us, send the pet's Growl
+    -- to grab it back. Off the GCD, throttled internally.
+    if cfg.petTaunt and self:PetLostAggro() then self:PetGrowl() end
 
     local popBurst = cfg.popCDs or (cfg.autoCDElite and isElite)
     if popBurst and inCombat then
@@ -385,10 +472,12 @@ function M:Rotate(cfg)
     if self:EnsureAspect(cfg, melee) then return end
 
     -- Auto-attack backbone: ranged keeps Auto Shot firing; melee starts swings.
+    -- Starting Auto Shot is its own press (vanilla cannot also cast Mark/Sting in
+    -- the same frame), so return when it fires; once running, the rest proceeds.
     if melee then
         AutoRota:EnsureAutoAttack()
     else
-        self:EnsureAutoShot()
+        if self:EnsureAutoShot() then return end
     end
 
     -- ----------------------------------------------------------------
@@ -408,17 +497,13 @@ function M:Rotate(cfg)
         if self:Queue("Aimed Shot") then return end
     end
 
-    -- 2c. Hunter's Mark upkeep.
+    -- 2c. Hunter's Mark upkeep (universal: the damage-amp debuff helps in both
+    --     ranged and melee, so it is maintained regardless of range state).
     if cfg.useHuntersMark then
         if self:MaintainDebuff("Hunter's Mark", 110) then return end
     end
 
-    -- 2d. Sting upkeep (the one configured slot).
-    if cfg.sting ~= "" then
-        if self:MaintainDebuff(cfg.sting, STING_DUR[cfg.sting] or 12) then return end
-    end
-
-    -- 2e. Immolation Trap on cooldown (Survival, usable in combat on 1.18.1).
+    -- 2d. Immolation Trap on cooldown (Survival, usable in combat on 1.18.1).
     if cfg.useImmolationTrap and self:KnowsSpell("Immolation Trap") and self:IsReady("Immolation Trap") then
         if self:Cast("Immolation Trap") then return end
     end
@@ -447,6 +532,12 @@ function M:Rotate(cfg)
     -- ----------------------------------------------------------------
     -- 3b. Ranged branch
     -- ----------------------------------------------------------------
+    -- Sting upkeep (the one configured slot). A sting is a ranged shot, so it is
+    -- maintained here, in the ranged branch only - never woven mid-melee.
+    if cfg.sting ~= "" then
+        if self:MaintainDebuff(cfg.sting, STING_DUR[cfg.sting] or 12) then return end
+    end
+
     -- AoE leads with Volley then Multi-Shot when toggled on.
     if aoe then
         if cfg.useVolley and self:KnowsSpell("Volley") and self:IsReady("Volley") then
@@ -488,7 +579,7 @@ function M:CmdMode(alias)
     local cfg = AutoRota:GetActiveProfile()
     if not cfg then msgOut("no profile active.", 1, 0.5, 0.3); return end
     local mode = self.modeAlias[string.lower(alias or "")]
-    if not mode then msgOut("usage: /ar mode ranged|melee", 1, 0.5, 0.3); return end
+    if not mode then msgOut("usage: /ar mode ranged|melee|auto", 1, 0.5, 0.3); return end
     cfg.mode = mode
     msgOut("playstyle = " .. mode .. ".")
 end

@@ -70,6 +70,8 @@ function M:BuildBody(ui, f)
     self.mendCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -622)
     self.mendSlider = ui:CreateSlider("mendPetHp", f, "Mend Pet below", function(v) if ui.buf then ui.buf.mendPetHp = v; ui:Refresh() end end)
     self.mendSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -648)
+    self.tauntCB = ui:CreateCheck("petTaunt", f, "Pet taunts when it loses aggro", "Growl", function(on) if ui.buf then ui.buf.petTaunt = on; ui:Refresh() end end)
+    self.tauntCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -648)
     self.kcCB = ui:CreateCheck("useKillCommand", f, "Kill Command on cd", "Kill Command", function(on) if ui.buf then ui.buf.useKillCommand = on; ui:Refresh() end end)
     self.kcCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -672)
     self.baitedCB = ui:CreateCheck("useBaitedShot", f, "Baited Shot on pet crit", "Baited Shot", function(on) if ui.buf then ui.buf.useBaitedShot = on; ui:Refresh() end end)
@@ -91,7 +93,8 @@ function M:BuildBody(ui, f)
     ui:Divider(f, -592)   -- above Pet
     ui:Divider(f, -698)   -- above Cooldowns
 
-    ui:Tip(self.modeDD, "Playstyle", "Ranged runs the Auto Shot + Steady Shot weave (BM/MM). Melee runs Aspect of the Wolf, melee swings, Raptor Strike and Mongoose Bite (Survival / BM-melee).", "Switch live with /ar mode ranged|melee.")
+    ui:Tip(self.modeDD, "Playstyle", "Auto picks ranged vs melee by your distance to the target each press, so shots fire at range and strikes fire in melee. Ranged runs the Auto Shot + Steady Shot weave (BM/MM). Melee runs Aspect of the Wolf, melee swings, Raptor Strike and Mongoose Bite (Survival / BM-melee).", "Switch live with /ar mode ranged|melee|auto.")
+    ui:Tip(self.tauntCB.cb, "Smart Pet Taunt", "When the mob peels off your pet onto you, sends the pet's Growl to grab it back (throttled). Off by default; leave it off for melee-weave builds where you want aggro.")
     ui:Tip(self.markCB.cb, "Hunter's Mark", "Applied once per target and refreshed when it falls off.")
     ui:Tip(self.stingDD, "Sting", "The one sting kept up. Serpent is the staple DoT; Scorpid lowers melee hit; Viper drains mana.")
     ui:Tip(self.steadyCB.cb, "Steady Shot", "Baseline at level 20. The 1:1 weave after each Auto Shot and the main filler. Queued so it does not clip the shot.")
@@ -121,8 +124,12 @@ end
 -- ============================================================
 function M:RefreshBody(ui, buf)
     -- mode dropdown
-    local modeOpts = { { label = "Ranged (BM / MM)", value = "ranged" }, { label = "Melee (Survival / BM)", value = "melee" } }
-    local modeLabel = { ranged = "Ranged (BM / MM)", melee = "Melee (Survival / BM)" }
+    local modeOpts = {
+        { label = "Auto (by distance)", value = "auto" },
+        { label = "Ranged (BM / MM)", value = "ranged" },
+        { label = "Melee (Survival / BM)", value = "melee" },
+    }
+    local modeLabel = { auto = "Auto (by distance)", ranged = "Ranged (BM / MM)", melee = "Melee (Survival / BM)" }
     local mcur = buf.mode or "ranged"
     ui:SetDropdown(self.modeDD, modeOpts, mcur, modeLabel[mcur] or mcur, ui.COL.white)
 
@@ -150,6 +157,7 @@ function M:RefreshBody(ui, buf)
     ui:BindCheck(self.aspectCB, buf.useAspect)
     ui:BindCheck(self.manaAspCB, buf.useManaAspect)
     ui:BindCheck(self.petCB, buf.petAttack)
+    ui:BindCheck(self.tauntCB, buf.petTaunt)
     ui:BindCheck(self.mendCB, buf.useMendPet)
     ui:BindCheck(self.kcCB, buf.useKillCommand)
     ui:BindCheck(self.baitedCB, buf.useBaitedShot)
