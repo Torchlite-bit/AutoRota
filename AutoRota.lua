@@ -15,7 +15,7 @@
 -- ============================================================
 
 AutoRota = {
-    ver = "0.8.2b",
+    ver = "0.8.3b",
     classes = {},     -- token -> module table
     active = nil,      -- the module for this character's class
     Loaded = false,
@@ -562,8 +562,13 @@ function AutoRota:RunRotation()
         self:Throttle("active profile incomplete, missing " .. table.concat(self.validCacheMissing, ", ") .. ". Running with what is available.")
     end
 
-    if not UnitExists("target") or UnitIsDead("target") then TargetNearestEnemy() end
-    if not UnitCanAttack("player", "target") then return end
+    -- Auto-acquire the nearest enemy when you have none, unless the module opts
+    -- out (autoAcquireTarget == false). Ranged classes like the Hunter opt out so
+    -- the rotation never grabs and pulls a random nearby mob - you pick targets.
+    if not UnitExists("target") or UnitIsDead("target") then
+        if self.active.autoAcquireTarget ~= false then TargetNearestEnemy() end
+    end
+    if not UnitExists("target") or not UnitCanAttack("player", "target") then return end
 
     -- Keep the white swing going for melee classes. This runs whether or not
     -- SuperCleveRoidMacros is loaded: EnsureAutoAttack only toggles Attack when

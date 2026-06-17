@@ -4,6 +4,29 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.8.3b — Hunter: range-state fixes, auto mode & smart pet taunt
+
+A pass on the Hunter module fixing the range-vs-melee state confusion and the Auto Shot stall, plus two requested features.
+
+### 🏹 Fixed: range-vs-melee state confusion
+- **Hunter's Mark and Serpent Sting failing in ranged mode** — in ranged mode the rotation started Auto Shot with `CastSpellByName` in the *same press* as Mark/Sting, and vanilla won't land two casts in one frame, so the instant lost (it only ever worked in melee mode, where Auto Shot isn't cast). Starting Auto Shot is now its own press and returns, so once it's running, Mark and Sting fire normally.
+- **Serpent Sting firing in melee** — Mark and Sting used to run before the melee/ranged split, so a sting (a ranged shot) fired mid-melee. Sting is now maintained in the **ranged branch only**; **Hunter's Mark stays universal** (it amps damage in both states).
+- **Errant auto-targeting** — the Hunter no longer auto-acquires a target (new per-module opt-out honored by the core), so the rotation can't grab and pull a random nearby mob and instantly sting it. You pick your targets.
+
+### 🏹 Fixed: Auto Shot stall
+- Auto Shot could get stuck and only resume after a manual target swap: the old per-target "assumed on" flag was never cleared, so a stalled shot was never restarted. It now uses the SuperWoW `UNIT_CASTEVENT` shot timing to detect a stall (no shot for the ranged swing + ~2s) and restarts automatically, with a self-re-poking fallback when no event data is present. No more target-swap to unstick.
+
+### ⚡ Added: Auto mode (distance-based switching)
+- A third playstyle, **Auto**, picks ranged vs melee each press from your distance to the target (`CheckInteractDistance`, ~10yd, with a short stickiness so it doesn't flicker at the boundary). Shots fire at range, strikes fire in melee, with no cross-mode bleed — which is also the clean fix for the whole state-confusion class of bugs. It's the **default for new profiles** (great for leveling). Switch with the panel dropdown or `/ar mode auto|ranged|melee`; `/ar trace` shows the effective mode as `mode=auto/melee` or `mode=auto/ranged`.
+
+### ⚡ Added: Smart pet taunt (opt-in)
+- When the mob peels off the pet onto you (target's target is you), the pet's **Growl** is sent to grab it back — found by scanning the pet action bar, throttled to respect its cooldown. Off by default (leave it off for melee-weave builds where you want the aggro); toggle in the Pet section of the panel.
+
+### 🧹 Cleanup
+- Removed the now-unused `inMelee` local from the rotation; no duplicate function definitions or orphaned fields introduced by the change. Melee auto-attack start is unchanged and still depends on **Attack** being on an action bar (documented) since vanilla has no API to force the white swing otherwise.
+
+---
+
 ## v0.8.2b — Hunter: frame-accurate Steady Shot weave (SuperWoW)
 
 Builds on 0.8.1b's swing gate with exact timing from SuperWoW (a hard requirement for this addon anyway).

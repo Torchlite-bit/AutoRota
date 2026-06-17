@@ -1,4 +1,4 @@
-# AutoRota ⚔️ (v0.8.2b)
+# AutoRota ⚔️ (v0.8.3b)
 
 **Smart, Modular Combat Automation for Turtle WoW (1.18.1)**
 
@@ -84,17 +84,19 @@ Cat (DPS), Bear (Tank), and Balance (Caster/Moonkin) in one form-adaptive engine
 
 ### 🏹 Hunter `(Beta)`
 
-Reworked for Turtle WoW 1.18.1's hunter changes, with a **Ranged** and a **Melee** playstyle selectable per profile (`/ar mode ranged|melee`):
+Reworked for Turtle WoW 1.18.1's hunter changes, with **Auto**, **Ranged**, and **Melee** playstyles selectable per profile (`/ar mode auto|ranged|melee`):
 
-* **Ranged (BM / MM):** Built around the **Auto Shot** backbone with **Steady Shot** (baseline at 20) as the 1:1 weave after each shot, and *Arcane Shot* / *Multi-Shot* weaved as instants. Auto Shot is kept *running* (toggle-safe: detected via `IsAutoRepeatAction`, with an assumed-on safeguard per target so it is never toggled off). Shots are queued through SuperWoW/Nampower so the weave never clips the shot in progress.
+* **Auto (by distance):** The default for new profiles. Picks ranged vs melee each press from your distance to the target (a short stickiness stops it flickering at the boundary), so shots fire at range and strikes fire in melee with no cross-mode bleed. Ideal while leveling, where mobs close fast.
+* **Ranged (BM / MM):** Built around the **Auto Shot** backbone with **Steady Shot** (baseline at 20) woven 1:1 after each shot — gated on the exact Auto Shot timing from SuperWoW's `UNIT_CASTEVENT` (interval fallback) so mashing never clips or starves it. *Arcane Shot* / *Multi-Shot* weave as instants. Auto Shot is kept *running* and now **self-unsticks**: if a shot is detected to have stalled it is restarted automatically, instead of needing a manual target swap. Starting Auto Shot is its own press, so it no longer blocks a same-press **Hunter's Mark** or **Sting**.
 * **Lock and Load (MM capstone):** *Aimed Shot* is **not** hard-cast on cooldown (that clips Auto Shot). Instead the rotation watches for the **Lock and Load** buff — a crit from Steady/Aimed/Arcane that resets Aimed Shot, drops its cast time, and makes it cleave a line — and fires *Aimed Shot* the instant it procs. A toggle lets you also cast it on cooldown if you prefer.
 * **Melee (Survival / BM-melee):** Keeps **Aspect of the Wolf** up, starts melee swings, uses **Raptor Strike** on cooldown and **Mongoose Bite** reactively in the window after you dodge, with optional *Wing Clip*. Survival can drop **Immolation Trap** on cooldown (Patch 1.18.1 allows traps in combat).
-* **One Sting Slot:** *Serpent*, *Scorpid*, or *Viper* (or none), from the panel or `/ar sting serpent|scorpid|viper|none`. Stings and *Hunter's Mark* are applied once per target and refreshed exactly when they fall off (SuperWoW spell-id detection).
+* **Range-Correct Upkeep:** **Hunter's Mark** is maintained in *both* modes (a universal damage-amp debuff). A **Sting** (*Serpent*, *Scorpid*, or *Viper*, or none — panel or `/ar sting`) is a ranged shot, so it is only applied in the ranged state and never woven mid-melee. Both are applied once per target and refreshed exactly when they fall off (SuperWoW spell-id detection).
+* **No Errant Pulls:** Being a ranged class, the Hunter does **not** auto-acquire a target — it will not grab and pull a random nearby mob, so you always choose what you are shooting.
 * **Aspect Management:** Keeps your combat aspect (Hawk ranged / Wolf melee) up, and can **swap to the mana-regenerating aspect** below a mana threshold, swapping back once recovered (hysteresis so it never flaps).
-* **Pet Support:** Pet attack, *Mend Pet* below a health slider, **Kill Command** on cooldown (BM), and an optional **Baited Shot** fired in the window after the pet crits.
+* **Pet Support:** Pet attack, *Mend Pet* below a health slider, **Kill Command** on cooldown (BM), an optional **Baited Shot** fired in the window after the pet crits, and an optional **Smart Pet Taunt** — when the mob peels onto you, the pet's *Growl* is sent to grab it back (off by default; leave it off for melee-weave builds where you want the aggro).
 * **AoE & Cooldowns:** *Volley* leads then *Multi-Shot* fills under `/ar aoe`. *Rapid Fire* and *Bestial Wrath* automate on the usual three-state model — always, elite/boss only, or off.
 
-> **Verification note:** A few 1.18.1 specifics are best-effort and gated by `KnowsSpell`, so an unknown name simply no-ops. If *Kill Command*, *Baited Shot*, the **Lock and Load** buff, or the mana aspect (tried: *Aspect of the Viper*, *Aspect of the Beast*) are not firing, run `/ar debug` and check the exact names — they drop into one place in `Class_Hunter.lua`.
+> **Verification note:** A few 1.18.1 specifics are best-effort and gated by `KnowsSpell`, so an unknown name simply no-ops. If *Kill Command*, *Baited Shot*, the **Lock and Load** buff, or the mana aspect (tried: *Aspect of the Viper*, *Aspect of the Beast*) are not firing, run `/ar debug` and check the exact names — they drop into one place in `Class_Hunter.lua`. Auto mode uses `CheckInteractDistance` (~10yd) as its melee proxy; `/ar trace` shows the effective mode as `mode=auto/melee` or `mode=auto/ranged`.
 
 ### ⚡ Shaman `(Beta)`
 
@@ -179,7 +181,7 @@ You can also change profile properties dynamically via chat or macros:
 | `/ar seal <profile> <debuff/damage> <alias>` | *(Paladin Only)* Sets a seal slot on the named profile. | `/ar seal DPS damage sor` |
 | `/ar strike <mode>` | *(Paladin Only)* Sets strike mode (`off`/`auto`/`cs`/`hs`/`hscs`). | `/ar strike hs` |
 | `/ar curse <alias>` | *(Warlock Only)* Switches the curse on the active profile. | `/ar curse coe` |
-| `/ar mode <ranged/melee>` | *(Hunter Only)* Switches the hunter playstyle. | `/ar mode melee` |
+| `/ar mode <auto/ranged/melee>` | *(Hunter Only)* Switches the hunter playstyle (auto = by distance). | `/ar mode auto` |
 | `/ar sting <alias>` | *(Hunter Only)* Sets the maintained sting (`serpent`/`scorpid`/`viper`/`none`). | `/ar sting serpent` |
 | `/ar style <bleed/shred>` | *(Druid Only)* Switches the cat style mid-fight. | `/ar style shred` |
 | `/ar form <cat/bear/caster>` | *(Druid Only)* Sets the preferred combat form (caster = Balance/Moonkin). | `/ar form caster` |
@@ -239,7 +241,7 @@ When using the /ar spell command, you can use short aliases:
 
 The Hunter module adds quick toggles you can bind to separate keys to adjust the rotation mid-fight without opening the panel:
 
-  * `/ar mode ranged|melee` : Switches the hunter playstyle (BM/MM ranged vs Survival/BM melee).
+  * `/ar mode auto|ranged|melee` : Switches the hunter playstyle. Auto picks ranged vs melee by distance to the target; ranged = BM/MM, melee = Survival/BM.
 
   * `/ar sting serpent|scorpid|viper|none` : Switches the maintained sting on the active profile.
 
