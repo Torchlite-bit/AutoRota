@@ -4,6 +4,28 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.8.4b — Hunter: the weave actually weaves, plus melee opener & Lacerate
+
+### 🏹 Fixed: Steady Shot now weaves 1:1 with Auto Shot
+The weave gate had a fatal edge: it computed the window purely from the last Auto Shot time, so the moment that timestamp went **stale** (Auto Shot paused during a Steady cast, or a shot event was missed) the window went negative and the gate read "wait" **forever** — which is why Steady stopped weaving while the instant shots kept firing. Three fixes:
+- **Stale fallback:** if the last-shot time isn't fresh, the gate falls back to a simple one-per-swing interval instead of locking to "wait". The weave can no longer get stuck.
+- **One Steady per shot cycle:** a guard ensures exactly one Steady between Auto Shots (it can't re-fire until the next shot lands), so it's a true 1:1 weave with no chaining.
+- **Steady is now the *primary* filler**, tried before Arcane/Multi-Shot; when its post-shot window is closed the instants fill the gap instead. Also clamps a minimum post-shot weave window so a fast ranged weapon still gets a Steady in rather than never weaving.
+- `/ar trace` still shows `steady=ready/precise` vs `wait/interval` to confirm the path live.
+- *Note:* Steady Shot is baseline at level 20 — below that there's nothing to weave (the gate is moot).
+
+### 🏹 Melee opener & priority (range-gated, not mode-gated)
+- **Serpent Sting and Hunter's Mark now open the pull in every mode** — Sting is gated on *actual distance* (applied while the target is still out of melee), so even a pure **melee** hunter lands Hunter's Mark + Serpent Sting on the pull, then stops stinging once you close to melee. (Or just use **Auto** mode, which does the same range handoff automatically.)
+- **Lacerate** added to the melee branch as a maintained bleed (Survival), slotted Mongoose Bite → Lacerate → Raptor Strike → Wing Clip. On by default in the Survival/melee templates, toggle in the panel or `/ar spell lacerate`. KnowsSpell-gated, so it no-ops if untrained.
+
+### 🏹 Aspects in melee
+- The **mana aspect swap (Viper)** now applies in melee too, not just ranged: a mana-heavy melee hunter drops to Viper below the threshold and swaps back to Aspect of the Wolf once recovered (same hysteresis). Aspect of the Monkey (dodge) remains a manual situational choice.
+
+### ❓ Does it range-check melee vs ranged?
+Yes — **Auto** mode (the default for new profiles, `/ar mode auto`) picks ranged vs melee each press from your distance to the target, so it opens at range with Mark + Sting + shots and switches to strikes as you close. `/ar trace` shows `mode=auto/ranged` or `mode=auto/melee`.
+
+---
+
 ## v0.8.3b — Hunter: range-state fixes, auto mode & smart pet taunt
 
 A pass on the Hunter module fixing the range-vs-melee state confusion and the Auto Shot stall, plus two requested features.

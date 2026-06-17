@@ -1,4 +1,4 @@
-# AutoRota ⚔️ (v0.8.3b)
+# AutoRota ⚔️ (v0.8.4b)
 
 **Smart, Modular Combat Automation for Turtle WoW (1.18.1)**
 
@@ -89,8 +89,8 @@ Reworked for Turtle WoW 1.18.1's hunter changes, with **Auto**, **Ranged**, and 
 * **Auto (by distance):** The default for new profiles. Picks ranged vs melee each press from your distance to the target (a short stickiness stops it flickering at the boundary), so shots fire at range and strikes fire in melee with no cross-mode bleed. Ideal while leveling, where mobs close fast.
 * **Ranged (BM / MM):** Built around the **Auto Shot** backbone with **Steady Shot** (baseline at 20) woven 1:1 after each shot — gated on the exact Auto Shot timing from SuperWoW's `UNIT_CASTEVENT` (interval fallback) so mashing never clips or starves it. *Arcane Shot* / *Multi-Shot* weave as instants. Auto Shot is kept *running* and now **self-unsticks**: if a shot is detected to have stalled it is restarted automatically, instead of needing a manual target swap. Starting Auto Shot is its own press, so it no longer blocks a same-press **Hunter's Mark** or **Sting**.
 * **Lock and Load (MM capstone):** *Aimed Shot* is **not** hard-cast on cooldown (that clips Auto Shot). Instead the rotation watches for the **Lock and Load** buff — a crit from Steady/Aimed/Arcane that resets Aimed Shot, drops its cast time, and makes it cleave a line — and fires *Aimed Shot* the instant it procs. A toggle lets you also cast it on cooldown if you prefer.
-* **Melee (Survival / BM-melee):** Keeps **Aspect of the Wolf** up, starts melee swings, uses **Raptor Strike** on cooldown and **Mongoose Bite** reactively in the window after you dodge, with optional *Wing Clip*. Survival can drop **Immolation Trap** on cooldown (Patch 1.18.1 allows traps in combat).
-* **Range-Correct Upkeep:** **Hunter's Mark** is maintained in *both* modes (a universal damage-amp debuff). A **Sting** (*Serpent*, *Scorpid*, or *Viper*, or none — panel or `/ar sting`) is a ranged shot, so it is only applied in the ranged state and never woven mid-melee. Both are applied once per target and refreshed exactly when they fall off (SuperWoW spell-id detection).
+* **Melee (Survival / BM-melee):** Keeps **Aspect of the Wolf** up, starts melee swings, and runs the priority **Mongoose Bite** (reactively in the window after you dodge) → **Lacerate** (maintained bleed) → **Raptor Strike** on cooldown → optional *Wing Clip*. Survival can drop **Immolation Trap** on cooldown (Patch 1.18.1 allows traps in combat). The mana-aspect swap to *Viper* works here too — a mana-heavy melee hunter drops to Viper when low and swaps back to Wolf once recovered.
+* **Range-Correct Upkeep:** **Hunter's Mark** is maintained in *both* modes (a universal damage-amp debuff). A **Sting** (*Serpent*, *Scorpid*, or *Viper*, or none — panel or `/ar sting`) is a ranged shot, gated on *actual distance*: it lands on the pull while the target is still out of melee — so even a pure **melee** hunter opens with **Hunter's Mark + Serpent Sting** — and then stops once you close in. Both are applied once per target and refreshed exactly when they fall off (SuperWoW spell-id detection).
 * **No Errant Pulls:** Being a ranged class, the Hunter does **not** auto-acquire a target — it will not grab and pull a random nearby mob, so you always choose what you are shooting.
 * **Aspect Management:** Keeps your combat aspect (Hawk ranged / Wolf melee) up, and can **swap to the mana-regenerating aspect** below a mana threshold, swapping back once recovered (hysteresis so it never flaps).
 * **Pet Support:** Pet attack, *Mend Pet* below a health slider, **Kill Command** on cooldown (BM), an optional **Baited Shot** fired in the window after the pet crits, and an optional **Smart Pet Taunt** — when the mob peels onto you, the pet's *Growl* is sent to grab it back (off by default; leave it off for melee-weave builds where you want the aggro).
@@ -257,7 +257,7 @@ When using the /ar spell command, you can use short aliases:
   * `mark` / `hm` → *Hunter's Mark*, `steady` / `st` → *Steady Shot*
   * `arcane` / `as` → *Arcane Shot*, `multi` / `ms` → *Multi-Shot*, `aimed` / `aim` → *Aimed Shot*
   * `volley` → *Volley*, `immolation` / `trap` → *Immolation Trap*
-  * `raptor` / `rs` → *Raptor Strike*, `mongoose` / `mb` → *Mongoose Bite*, `wingclip` / `wc` → *Wing Clip*
+  * `raptor` / `rs` → *Raptor Strike*, `mongoose` / `mb` → *Mongoose Bite*, `lacerate` / `lac` → *Lacerate*, `wingclip` / `wc` → *Wing Clip*
   * `aspect` → keep combat aspect up, `killcommand` / `kc` → *Kill Command*, `baited` → *Baited Shot*, `mend` → *Mend Pet*
 
 ### Hunter Sting Aliases
