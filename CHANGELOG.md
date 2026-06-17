@@ -4,6 +4,14 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.8.5b — Hunter: Carve (Survival melee AoE)
+
+### 🏹 Added: Carve
+- **Carve** is now in the melee branch — the Survival cone AoE (up to 5 targets in a 10yd cone, instant, shares its cooldown with Multi-Shot). It leads the melee branch when AoE is toggled on (`/ar aoe`), mirroring how Volley/Multi-Shot lead ranged AoE. On by default in the Survival/melee templates, toggle in the panel or `/ar spell carve`; `KnowsSpell`-gated so it no-ops if untrained.
+- Sits in priority above Mongoose Bite / Lacerate / Raptor Strike while AoE is on, so multi-target melee pulls open with the cleave.
+
+---
+
 ## v0.8.4b — Hunter: the weave actually weaves, plus melee opener & Lacerate
 
 ### 🏹 Fixed: Steady Shot now weaves 1:1 with Auto Shot
