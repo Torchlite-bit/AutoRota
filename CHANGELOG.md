@@ -4,6 +4,34 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.8.6b — Hunter: rotation refactor (opener, mana efficiency, BM weave, AoE)
+
+A pass over the whole Hunter rotation for clean, mana-efficient play from level 1 to 60. Priority order was restructured and several leveling/BM behaviors added; all of it stays `KnowsSpell`-gated so it scales as abilities are trained.
+
+### 🏹 Strict opener (the level-6 inconsistency)
+- **Hunter's Mark now always leads.** It's the first GCD action, and the rotation will not advance to Serpent Sting or any shot until Mark is confirmed on the target. Serpent Sting carries an explicit "Mark is up" gate on top of the ordering, so the opener is deterministic.
+
+### 🏹 Mana-efficient leveling rotation
+- **Low-HP execute:** Serpent Sting is no longer applied to a target below `30%` HP (it can't tick its full DoT) — the rotation finishes with **Arcane Shot** instead of wasting the cast.
+- **Arcane Shot is no longer spammed.** As a mana-hungry filler it now only fires when mana is above `50%` *or* when Auto Shot can't fire (you're moving / out of range, detected by stale shot timing). Stationary, it stays out of the way so **Auto Shot** carries the damage and conserves mana.
+- **Aimed Shot opener (optional toggle):** open the pull with a hard-cast Aimed Shot before Auto Shot starts. Fires exactly once at the start (panel checkbox under Aimed Shot, or `/ar spell opener`).
+- Aspect handling already covers Hawk (ranged), Wolf (melee, arrow/mana conservation), and the dynamic Viper swap when low — in both stances.
+
+### 🏹 BM ranged weave & burst
+- The **1:1 Auto Shot ↔ Steady Shot weave** is the primary loop (Steady is swing-gated so it never clips, with the stale-timing fallback from 0.8.4b). **Multi-Shot** then weaves into the post-Steady downtime (Auto → Steady → Multi) for single-target burst when GCDs allow.
+
+### 🏹 AoE rotation + pet cleave
+- AoE order is now **Multi-Shot on cooldown → Volley** (channel for dense packs); **Carve** leads the *melee* branch under AoE.
+- **Pet cleave:** while AoE mode is on, the pet's **Thunderstomp** is driven automatically (off the GCD, throttled, no-op if the pet lacks it), on top of the pet attacking the primary target.
+
+### 🏹 Dynamic talent integration (1–60)
+- Talent-granted abilities slot in automatically as they're learned (they appear in the spellbook, so `KnowsSpell` detects them): **Carve / Lacerate** (Survival), **Kill Command / Baited Shot** (BM, Baited fired in the window after a pet crit), **Steady Shot** (MM). Defaults are set per spec template; everything no-ops cleanly when untrained, so the same profile works from level 1 up.
+
+### 🧹 Internals
+- `Rotate` reorganized into clear numbered phases (off-GCD → aspect → Mark → opener → backbone → GCD priority → melee/ranged branches); added `PetCleave`, `STING_HP_FLOOR`, `ARCANE_MANA_FLOOR`; trace now shows target `hp=`. No duplicate or orphaned code. Panel grew two rows (Aimed opener, earlier Carve) with the height adjusted to match.
+
+---
+
 ## v0.8.5b — Hunter: Carve (Survival melee AoE)
 
 ### 🏹 Added: Carve

@@ -1,4 +1,4 @@
-# AutoRota ⚔️ (v0.8.5b)
+# AutoRota ⚔️ (v0.8.6b)
 
 **Smart, Modular Combat Automation for Turtle WoW (1.18.1)**
 

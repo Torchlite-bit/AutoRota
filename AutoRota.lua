@@ -15,7 +15,7 @@
 -- ============================================================
 
 AutoRota = {
-    ver = "0.8.5b",
+    ver = "0.8.6b",
     classes = {},     -- token -> module table
     active = nil,      -- the module for this character's class
     Loaded = false,
