@@ -36,66 +36,68 @@ function M:BuildBody(ui, f)
     self.aimedCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -326)
     self.aimedProcCB = ui:CreateCheck("aimedOnlyOnProc", f, "Aimed only on Lock and Load", nil, function(on) if ui.buf then ui.buf.aimedOnlyOnProc = on; ui:Refresh() end end)
     self.aimedProcCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 40, -350)
+    self.aimedOpenerCB = ui:CreateCheck("useAimedOpener", f, "Aimed Shot as opener (pre-pull)", nil, function(on) if ui.buf then ui.buf.useAimedOpener = on; ui:Refresh() end end)
+    self.aimedOpenerCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 40, -374)
 
     -- AoE & Survival
-    ui:FS(f, "GameFontNormal", "AoE & Survival"):SetPoint("TOPLEFT", f, "TOPLEFT", 20, -384)
+    ui:FS(f, "GameFontNormal", "AoE & Survival"):SetPoint("TOPLEFT", f, "TOPLEFT", 20, -408)
     self.volleyCB = ui:CreateCheck("useVolley", f, "Volley leads AoE", "Volley", function(on) if ui.buf then ui.buf.useVolley = on; ui:Refresh() end end)
-    self.volleyCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -406)
+    self.volleyCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -430)
     self.trapCB = ui:CreateCheck("useImmolationTrap", f, "Immolation Trap on cd", "Immolation Trap", function(on) if ui.buf then ui.buf.useImmolationTrap = on; ui:Refresh() end end)
-    self.trapCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -406)
+    self.trapCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -430)
 
     -- Melee
-    ui:FS(f, "GameFontNormal", "Melee"):SetPoint("TOPLEFT", f, "TOPLEFT", 20, -440)
+    ui:FS(f, "GameFontNormal", "Melee"):SetPoint("TOPLEFT", f, "TOPLEFT", 20, -464)
     self.raptorCB = ui:CreateCheck("useRaptorStrike", f, "Raptor Strike", "Raptor Strike", function(on) if ui.buf then ui.buf.useRaptorStrike = on; ui:Refresh() end end)
-    self.raptorCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -462)
+    self.raptorCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -486)
     self.mongooseCB = ui:CreateCheck("useMongooseBite", f, "Mongoose Bite (after dodge)", "Mongoose Bite", function(on) if ui.buf then ui.buf.useMongooseBite = on; ui:Refresh() end end)
-    self.mongooseCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -462)
+    self.mongooseCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -486)
     self.wingCB = ui:CreateCheck("useWingClip", f, "Wing Clip", "Wing Clip", function(on) if ui.buf then ui.buf.useWingClip = on; ui:Refresh() end end)
-    self.wingCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -486)
+    self.wingCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -510)
     self.lacerateCB = ui:CreateCheck("useLacerate", f, "Lacerate bleed", "Lacerate", function(on) if ui.buf then ui.buf.useLacerate = on; ui:Refresh() end end)
-    self.lacerateCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -486)
+    self.lacerateCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -510)
     self.carveCB = ui:CreateCheck("useCarve", f, "Carve (melee AoE, with /ar aoe)", "Carve", function(on) if ui.buf then ui.buf.useCarve = on; ui:Refresh() end end)
-    self.carveCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -510)
+    self.carveCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -534)
 
     -- Aspect
-    ui:FS(f, "GameFontNormal", "Aspect"):SetPoint("TOPLEFT", f, "TOPLEFT", 20, -546)
+    ui:FS(f, "GameFontNormal", "Aspect"):SetPoint("TOPLEFT", f, "TOPLEFT", 20, -570)
     self.aspectCB = ui:CreateCheck("useAspect", f, "Keep combat aspect up (Hawk / Wolf)", nil, function(on) if ui.buf then ui.buf.useAspect = on; ui:Refresh() end end)
-    self.aspectCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -568)
+    self.aspectCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -592)
     self.manaAspCB = ui:CreateCheck("useManaAspect", f, "Swap to mana aspect when low", nil, function(on) if ui.buf then ui.buf.useManaAspect = on; ui:Refresh() end end)
-    self.manaAspCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -592)
+    self.manaAspCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -616)
     self.manaSlider = ui:CreateSlider("manaAspectPct", f, "swap below", function(v) if ui.buf then ui.buf.manaAspectPct = v; ui:Refresh() end end)
-    self.manaSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 210, -592)
+    self.manaSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 210, -616)
 
     -- Pet
-    ui:FS(f, "GameFontNormal", "Pet"):SetPoint("TOPLEFT", f, "TOPLEFT", 20, -626)
+    ui:FS(f, "GameFontNormal", "Pet"):SetPoint("TOPLEFT", f, "TOPLEFT", 20, -650)
     self.petCB = ui:CreateCheck("petAttack", f, "Send pet to attack", nil, function(on) if ui.buf then ui.buf.petAttack = on; ui:Refresh() end end)
-    self.petCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -648)
+    self.petCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -672)
     self.mendCB = ui:CreateCheck("useMendPet", f, "Mend Pet when hurt", "Mend Pet", function(on) if ui.buf then ui.buf.useMendPet = on; ui:Refresh() end end)
-    self.mendCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -648)
+    self.mendCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -672)
     self.mendSlider = ui:CreateSlider("mendPetHp", f, "Mend Pet below", function(v) if ui.buf then ui.buf.mendPetHp = v; ui:Refresh() end end)
-    self.mendSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -674)
+    self.mendSlider:SetPoint("TOPLEFT", f, "TOPLEFT", 28, -698)
     self.tauntCB = ui:CreateCheck("petTaunt", f, "Pet taunts when it loses aggro", "Growl", function(on) if ui.buf then ui.buf.petTaunt = on; ui:Refresh() end end)
-    self.tauntCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -674)
+    self.tauntCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -698)
     self.kcCB = ui:CreateCheck("useKillCommand", f, "Kill Command on cd", "Kill Command", function(on) if ui.buf then ui.buf.useKillCommand = on; ui:Refresh() end end)
-    self.kcCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -698)
+    self.kcCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -722)
     self.baitedCB = ui:CreateCheck("useBaitedShot", f, "Baited Shot on pet crit", "Baited Shot", function(on) if ui.buf then ui.buf.useBaitedShot = on; ui:Refresh() end end)
-    self.baitedCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -698)
+    self.baitedCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -722)
 
     -- Cooldowns
-    ui:FS(f, "GameFontNormal", "Cooldowns"):SetPoint("TOPLEFT", f, "TOPLEFT", 20, -732)
+    ui:FS(f, "GameFontNormal", "Cooldowns"):SetPoint("TOPLEFT", f, "TOPLEFT", 20, -756)
     self.cdCB = ui:CreateCheck("popCDs", f, "Always pop cooldowns", nil, function(on) if ui.buf then ui.buf.popCDs = on; ui:Refresh() end end)
-    self.cdCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -754)
+    self.cdCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 22, -778)
     self.cdEliteCB = ui:CreateCheck("autoCDElite", f, "Auto on elite and boss", nil, function(on) if ui.buf then ui.buf.autoCDElite = on; ui:Refresh() end end)
-    self.cdEliteCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -754)
+    self.cdEliteCB.cb:SetPoint("TOPLEFT", f, "TOPLEFT", 200, -778)
 
     ui:Divider(f, -134)   -- above Playstyle
     ui:Divider(f, -192)   -- above Targeting
     ui:Divider(f, -272)   -- above Ranged Shots
-    ui:Divider(f, -376)   -- above AoE & Survival
-    ui:Divider(f, -432)   -- above Melee
-    ui:Divider(f, -538)   -- above Aspect
-    ui:Divider(f, -618)   -- above Pet
-    ui:Divider(f, -724)   -- above Cooldowns
+    ui:Divider(f, -400)   -- above AoE & Survival
+    ui:Divider(f, -456)   -- above Melee
+    ui:Divider(f, -562)   -- above Aspect
+    ui:Divider(f, -642)   -- above Pet
+    ui:Divider(f, -748)   -- above Cooldowns
 
     ui:Tip(self.modeDD, "Playstyle", "Auto picks ranged vs melee by your distance to the target each press, so shots fire at range and strikes fire in melee. Ranged runs the Auto Shot + Steady Shot weave (BM/MM). Melee runs Aspect of the Wolf, melee swings, Raptor Strike and Mongoose Bite (Survival / BM-melee).", "Switch live with /ar mode ranged|melee|auto.")
     ui:Tip(self.tauntCB.cb, "Smart Pet Taunt", "When the mob peels off your pet onto you, sends the pet's Growl to grab it back (throttled). Off by default; leave it off for melee-weave builds where you want aggro.")
@@ -179,6 +181,7 @@ function M:RefreshBody(ui, buf)
         self.aimedProcCB.cb:Disable()
         self.aimedProcCB.label:SetText("Aimed only on Lock and Load"); ui:Color(self.aimedProcCB.label, ui.COL.grey)
     end
+    ui:BindCheck(self.aimedOpenerCB, buf.useAimedOpener)
 
     -- mana aspect slider follows the swap checkbox
     local map = buf.manaAspectPct or 30

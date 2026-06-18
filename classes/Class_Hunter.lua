@@ -28,12 +28,13 @@
 
 local M = AutoRota:NewClassModule("HUNTER")
 M.uiTitle = "Hunter"
-M.uiHeight = 826
+M.uiHeight = 850
 M.meleeAutoAttack = false   -- managed here: Auto Shot (ranged) or Attack (melee)
 M.autoAcquireTarget = false -- a ranged class should not auto-pull random mobs; pick targets
 
 -- Chat output is shared in the core; this shim keeps call sites unchanged.
 local function msgOut(text, r, g, b) AutoRota:Msg(text, r, g, b) end
+local floor = math.floor
 
 local MEND_PET_CD = 12   -- Mend Pet HoT lasts ~15s, refresh a little early
 local REACT_WINDOW = 5.0 -- Mongoose Bite stays usable ~5s after a dodge
@@ -46,6 +47,12 @@ local STEADY_CAST_DEFAULT = 1.5   -- assumed Steady Shot cast time until measure
 -- Auto Shot is considered stalled if no shot has fired for the ranged swing plus
 -- this margin (covers a Steady Shot pause); then we restart it automatically.
 local AUTOSHOT_STALL = 2.0
+-- Below this target HP%, a fresh Serpent Sting cannot tick its full duration, so
+-- the rotation finishes with Arcane Shot instead of wasting the DoT.
+local STING_HP_FLOOR = 30
+-- Arcane Shot is mana-inefficient, so the stationary filler only fires above this
+-- mana% (it always fires while moving, when Auto Shot cannot).
+local ARCANE_MANA_FLOOR = 50
 
 -- The mana-regenerating aspect (Turtle). First known name is used; gated by
 -- KnowsSpell so an unknown name is simply inert.
@@ -85,6 +92,7 @@ M.spellAlias = {
     wingclip = "useWingClip", wc = "useWingClip",
     lacerate = "useLacerate", lac = "useLacerate",
     carve = "useCarve",
+    opener = "useAimedOpener", aimedopener = "useAimedOpener",
     immolation = "useImmolationTrap", trap = "useImmolationTrap",
     aspect = "useAspect",
     killcommand = "useKillCommand", kc = "useKillCommand",
@@ -176,7 +184,7 @@ function M:NormalizeProfile(c)
         useAspect = true, rangedAspect = "Aspect of the Hawk",
         useManaAspect = false, manaAspectPct = 30,
         petAttack = true, useMendPet = true, mendPetHp = 50,
-        petTaunt = false, useLacerate = false, useCarve = false,
+        petTaunt = false, useLacerate = false, useCarve = false, useAimedOpener = false,
         useKillCommand = false, useBaitedShot = false,
         popCDs = false, autoCDElite = false,
     }
@@ -383,6 +391,25 @@ function M:PetGrowl()
     self.petGrowlT = now
 end
 
+-- Pet AoE cleave for AoE mode (Thunderstomp on gorillas, etc.). Like the taunt,
+-- pet abilities live on the pet bar, so we scan for Thunderstomp, cache the slot,
+-- and cast it throttled. No-ops if the pet has no cleave.
+function M:PetCleave()
+    local now = GetTime()
+    if (now - (self.petCleaveT or 0)) < 2.0 then return end
+    local slot = self.petCleaveSlot
+    if not (slot and GetPetActionInfo(slot) == "Thunderstomp") then
+        slot = nil
+        for i = 1, 10 do
+            if GetPetActionInfo(i) == "Thunderstomp" then slot = i; break end
+        end
+        self.petCleaveSlot = slot
+    end
+    if not slot then return end
+    CastPetAction(slot)
+    self.petCleaveT = now
+end
+
 -- Mana aspect hysteresis: drop to the mana aspect below the low mark, swap
 -- back to the combat aspect once mana climbs a buffer above it.
 function M:UpdateAspectState(cfg)
@@ -422,6 +449,11 @@ function M:Rotate(cfg)
     local aoe      = cfg.aoeMode and true or false
     local inCombat = UnitAffectingCombat("player")
     local inMeleeNow = self:InMeleeRange()   -- actual range to target, independent of mode
+    local targetHP   = self:TargetHPPct()
+    -- Strict opener gate: Serpent Sting may only follow a confirmed Hunter's Mark.
+    -- (True when Mark is disabled or unlearned, so it never blocks at low level.)
+    local markOK = (not cfg.useHuntersMark) or (not self:KnowsSpell("Hunter's Mark"))
+        or self:TargetDebuffUp("Hunter's Mark", nil)
     -- Effective range state. "auto" picks ranged vs melee by distance each press
     -- (so abilities only fire in the matching state); otherwise honor the choice.
     local melee
@@ -435,6 +467,7 @@ function M:Rotate(cfg)
 
     if self.trace then
         self:Trace("mode=" .. (cfg.mode or "ranged") .. (cfg.mode == "auto" and ("/" .. (melee and "melee" or "ranged")) or "")
+            .. " hp=" .. floor(targetHP)
             .. " sting=" .. (cfg.sting ~= "" and cfg.sting or "-")
             .. " mark=" .. (cfg.useHuntersMark and (self:TargetDebuffUp("Hunter's Mark", nil) and "Y" or "n") or "-")
             .. " L&L=" .. (self:HasBuff("Lock and Load") and "Y" or "n")
@@ -453,6 +486,10 @@ function M:Rotate(cfg)
     -- Smart pet taunt (opt-in): if the mob peels onto us, send the pet's Growl
     -- to grab it back. Off the GCD, throttled internally.
     if cfg.petTaunt and self:PetLostAggro() then self:PetGrowl() end
+
+    -- AoE pet cleave: while AoE mode is on, drive the pet's Thunderstomp. Off GCD,
+    -- throttled, no-ops if the pet lacks it.
+    if aoe and cfg.petAttack and UnitExists("pet") then self:PetCleave() end
 
     local popBurst = cfg.popCDs or (cfg.autoCDElite and isElite)
     if popBurst and inCombat then
@@ -474,9 +511,26 @@ function M:Rotate(cfg)
     -- ----------------------------------------------------------------
     if self:EnsureAspect(cfg, melee) then return end
 
-    -- Auto-attack backbone: ranged keeps Auto Shot firing; melee starts swings.
-    -- Starting Auto Shot is its own press (vanilla cannot also cast Mark/Sting in
-    -- the same frame), so return when it fires; once running, the rest proceeds.
+    -- ----------------------------------------------------------------
+    -- 2. Hunter's Mark ALWAYS leads (strict opener). The rotation does not
+    --    proceed to Sting or shots until Mark is on the target. Universal, since
+    --    the damage-amp debuff helps in melee too.
+    -- ----------------------------------------------------------------
+    if cfg.useHuntersMark then
+        if self:MaintainDebuff("Hunter's Mark", 110) then return end
+    end
+
+    -- 3. Aimed Shot opener (optional): the first ranged shot, fired before Auto
+    --    Shot starts. Gated on Auto Shot not yet running this fight plus its own
+    --    cooldown, so it goes out exactly once at the pull.
+    if cfg.useAimedOpener and not melee and not self.autoShotOn
+        and self:KnowsSpell("Aimed Shot") and self:IsReady("Aimed Shot") then
+        if self:Queue("Aimed Shot") then return end
+    end
+
+    -- 4. Auto-attack backbone: ranged keeps Auto Shot firing (the mana-free damage
+    --    backbone); melee starts swings. Starting Auto Shot is its own press
+    --    (vanilla cannot also cast in the same frame), so return when it fires.
     if melee then
         AutoRota:EnsureAutoAttack()
     else
@@ -484,42 +538,37 @@ function M:Rotate(cfg)
     end
 
     -- ----------------------------------------------------------------
-    -- 2. GCD priority (strict, one cast per press via early return)
+    -- 5. GCD priority (strict, one cast per press via early return)
     -- ----------------------------------------------------------------
 
-    -- 2a. Mend Pet when the pet is hurting (throttled, HoT lasts ~15s).
+    -- 5a. Mend Pet when the pet is hurting (throttled, HoT lasts ~15s).
     if cfg.useMendPet and UnitExists("pet") and self:KnowsSpell("Mend Pet") then
         if self:PetHPPct() < (cfg.mendPetHp or 50) and (now - (self.mendPetT or 0)) > MEND_PET_CD then
             if self:Cast("Mend Pet") then self.mendPetT = now; return end
         end
     end
 
-    -- 2b. Lock and Load reaction (MM capstone): cast Aimed Shot NOW. The proc
+    -- 5b. Lock and Load reaction (MM capstone): cast Aimed Shot NOW. The proc
     --     drops its cast time and makes it cleave a line, so it never clips.
     if cfg.useAimedShot and self:KnowsSpell("Aimed Shot") and self:HasBuff("Lock and Load") then
         if self:Queue("Aimed Shot") then return end
     end
 
-    -- 2c. Hunter's Mark upkeep (universal: the damage-amp debuff helps in both
-    --     ranged and melee, so it is maintained regardless of range state).
-    if cfg.useHuntersMark then
-        if self:MaintainDebuff("Hunter's Mark", 110) then return end
-    end
-
-    -- 2d. Sting upkeep. A sting is a ranged shot, so it is gated on ACTUAL range,
-    --     not mode: it lands on the pull (target still out of melee) - giving even
-    --     a melee hunter the Serpent Sting opener - and stops once you close in.
-    if cfg.sting ~= "" and not inMeleeNow then
+    -- 5c. Serpent Sting: only AFTER Hunter's Mark is confirmed, only at range (it
+    --     is a ranged shot, so even a melee hunter lands it on the pull and stops
+    --     once closed), and only on a target healthy enough to tick the full DoT.
+    --     Low-HP mobs are finished with Arcane Shot in the ranged branch instead.
+    if cfg.sting ~= "" and not inMeleeNow and markOK and targetHP > STING_HP_FLOOR then
         if self:MaintainDebuff(cfg.sting, STING_DUR[cfg.sting] or 12) then return end
     end
 
-    -- 2e. Immolation Trap on cooldown (Survival, usable in combat on 1.18.1).
+    -- 5d. Immolation Trap on cooldown (Survival, usable in combat on 1.18.1).
     if cfg.useImmolationTrap and self:KnowsSpell("Immolation Trap") and self:IsReady("Immolation Trap") then
         if self:Cast("Immolation Trap") then return end
     end
 
     -- ----------------------------------------------------------------
-    -- 3a. Melee branch
+    -- 6a. Melee branch
     -- ----------------------------------------------------------------
     if melee then
         -- Carve: the Survival melee cone AoE (up to 5 targets, shares its cooldown
@@ -549,39 +598,53 @@ function M:Rotate(cfg)
     end
 
     -- ----------------------------------------------------------------
-    -- 3b. Ranged branch
+    -- 6b. Ranged branch
     -- ----------------------------------------------------------------
-    -- AoE leads with Volley then Multi-Shot when toggled on.
+    -- AoE: Multi-Shot on cooldown (3+ targets), then Volley channel (4+ dense).
     if aoe then
-        if cfg.useVolley and self:KnowsSpell("Volley") and self:IsReady("Volley") then
-            if self:Queue("Volley") then return end
-        end
         if cfg.useMultiShot and self:KnowsSpell("Multi-Shot") and self:IsReady("Multi-Shot") then
             if self:Queue("Multi-Shot") then return end
+        end
+        if cfg.useVolley and self:KnowsSpell("Volley") and self:IsReady("Volley") then
+            if self:Queue("Volley") then return end
         end
     end
 
     -- Steady Shot is the PRIMARY weave: tried first, but gated to the window right
     -- after each Auto Shot. When the gate is closed (mid-swing) or Steady is
-    -- unlearned, the instant shots below fill the gap instead - so the cast-time
-    -- Steady never clips Auto Shot, yet still goes out once per swing.
+    -- unlearned, the shots below fill the gap instead - so the cast-time Steady
+    -- never clips Auto Shot, yet still goes out 1:1 with each shot.
     if cfg.useSteadyShot and self:KnowsSpell("Steady Shot") and self:SteadyReady() then
         if self:Queue("Steady Shot") then self.steadyT = GetTime(); return end
     end
 
-    -- Multi-Shot on cooldown (instant filler).
+    -- Multi-Shot woven into the post-Steady downtime (single-target burst when you
+    -- have the GCDs to spare): Auto Shot -> Steady -> Multi-Shot.
     if cfg.useMultiShot and self:KnowsSpell("Multi-Shot") and self:IsReady("Multi-Shot") then
         if self:Queue("Multi-Shot") then return end
     end
 
-    -- Arcane Shot on cooldown (instant filler).
-    if cfg.useArcaneShot and self:KnowsSpell("Arcane Shot") and self:IsReady("Arcane Shot") then
+    -- Execute: a low-HP mob is not worth a fresh Sting DoT, so Arcane Shot finishes
+    -- it (instant). Runs regardless of the mana gate below - this is a kill.
+    if cfg.useArcaneShot and self:KnowsSpell("Arcane Shot")
+        and targetHP <= STING_HP_FLOOR and self:IsReady("Arcane Shot") then
         if self:Queue("Arcane Shot") then return end
     end
 
-    -- Aimed Shot on cooldown ONLY when the proc-only guard is off (it clips
-    -- Auto Shot otherwise; the Lock and Load reaction above is the safe path).
-    if cfg.useAimedShot and not cfg.aimedOnlyOnProc
+    -- Arcane Shot filler: mana-inefficient, so only when mana is plentiful OR when
+    -- Auto Shot cannot fire (moving / out of range -> shot timing has gone stale),
+    -- so it never gets spammed during the stationary mana-conserving rotation.
+    if cfg.useArcaneShot and self:KnowsSpell("Arcane Shot") and self:IsReady("Arcane Shot") then
+        local autoStale = not (self.lastAutoShot and self.lastAutoShot > 0
+            and (now - self.lastAutoShot) < (self:RangedSpeed() + 1.0))
+        if self:ManaPct() >= ARCANE_MANA_FLOOR or autoStale then
+            if self:Queue("Arcane Shot") then return end
+        end
+    end
+
+    -- Aimed Shot on cooldown ONLY when neither the proc-only guard nor the opener
+    -- mode owns it (it clips Auto Shot otherwise; Lock and Load is the safe path).
+    if cfg.useAimedShot and not cfg.aimedOnlyOnProc and not cfg.useAimedOpener
         and self:KnowsSpell("Aimed Shot") and self:IsReady("Aimed Shot") then
         if self:Queue("Aimed Shot") then return end
     end
