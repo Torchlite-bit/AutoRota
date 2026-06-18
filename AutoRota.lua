@@ -15,7 +15,7 @@
 -- ============================================================
 
 AutoRota = {
-    ver = "0.8.6b",
+    ver = "0.8.8b",
     classes = {},     -- token -> module table
     active = nil,      -- the module for this character's class
     Loaded = false,
@@ -542,6 +542,33 @@ end
 -- ============================================================
 -- Rotation entry point
 -- ============================================================
+-- Whether AutoRota acquires its own target. Default on. Off defers targeting to
+-- a separate assist addon, so this character only acts on the target that addon
+-- sets and never pulls a stray enemy on its own.
+function AutoRota:SelfTargetEnabled()
+    if AutoRotaDB and AutoRotaDB.acquire == false then return false end
+    return true
+end
+
+-- /ar acquire on|off - toggle self-targeting (also on the minimap right-click).
+function AutoRota:CmdAcquire(arg)
+    local low = string.lower(arg or "")
+    if low == "" then
+        local on = self:SelfTargetEnabled()
+        msgOut("self targeting is " .. (on and "on (acquires nearest enemy)" or "off (defers to your assist addon)") .. ". Use /ar acquire on or off.")
+        return
+    end
+    if low == "on" or low == "self" then
+        if AutoRotaDB then AutoRotaDB.acquire = true end
+        msgOut("self targeting on. AutoRota acquires the nearest enemy when it has no target.")
+    elseif low == "off" or low == "assist" or low == "defer" then
+        if AutoRotaDB then AutoRotaDB.acquire = false end
+        msgOut("self targeting off. AutoRota leaves targeting to your assist addon and only acts on the set target.")
+    else
+        msgOut("usage: /ar acquire on or /ar acquire off.", 1, 0.5, 0.3)
+    end
+end
+
 function AutoRota:RunRotation()
     if not self.active then self:Throttle("no module for your class yet."); return end
     local cfg = self:GetActiveProfile()
@@ -562,21 +589,42 @@ function AutoRota:RunRotation()
         self:Throttle("active profile incomplete, missing " .. table.concat(self.validCacheMissing, ", ") .. ". Running with what is available.")
     end
 
-    -- Auto-acquire the nearest enemy when you have none, unless the module opts
-    -- out (autoAcquireTarget == false). Ranged classes like the Hunter opt out so
-    -- the rotation never grabs and pulls a random nearby mob - you pick targets.
-    if not UnitExists("target") or UnitIsDead("target") then
-        if self.active.autoAcquireTarget ~= false then TargetNearestEnemy() end
-    end
-    if not UnitExists("target") or not UnitCanAttack("player", "target") then return end
+    -- Support modules (e.g. the paladin heal mode) may run without an attackable
+    -- target and must not be forced to grab one.
+    local supportRun = self.active.RunsWithoutTarget and self.active:RunsWithoutTarget(cfg)
 
-    -- Keep the white swing going for melee classes. This runs whether or not
+    -- Auto-acquire the nearest enemy when you have none, behind TWO independent
+    -- gates: the user's global toggle (/ar acquire or the minimap option) and a
+    -- per-module opt-out (autoAcquireTarget == false, e.g. the Hunter, so a ranged
+    -- class never grabs and pulls a random mob). With acquisition off we defer to
+    -- an assist addon and drop any corpse so it can reassign us.
+    if not UnitExists("target") or UnitIsDead("target") then
+        if self:SelfTargetEnabled() and self.active.autoAcquireTarget ~= false and not supportRun then
+            TargetNearestEnemy()
+        elseif UnitExists("target") and UnitIsDead("target") then
+            ClearTarget()
+        end
+    end
+
+    local hasEnemy = UnitExists("target") and not UnitIsDead("target") and UnitCanAttack("player", "target")
+    if not hasEnemy then
+        -- No attackable target: a support module still runs (to heal); others hold.
+        if supportRun then
+            self:SnapshotBuffs()
+            self:SnapshotTargetDebuffs()
+            self.active:Rotate(cfg)
+            UIErrorsFrame:Clear()
+        end
+        return
+    end
+
+    -- Keep the white swing going for melee classes. Runs whether or not
     -- SuperCleveRoidMacros is loaded: EnsureAutoAttack only toggles Attack when
     -- you are not already swinging, so it is a no-op if SCRM (or anything else)
-    -- already started it, and it fills the gap if nothing did. meleeAutoAttack
-    -- == false (e.g. the Druid, which swings only in Cat/Bear and casts in
-    -- caster form) opts out here and manages its own swing in the module.
-    if self.active.meleeAutoAttack ~= false then self:EnsureAutoAttack() end
+    -- already started it. Gated on melee range so an accidentally targeted far
+    -- enemy never starts a swing (no stray pull). meleeAutoAttack == false (e.g.
+    -- the Druid) opts out and manages its own swing in the module.
+    if self.active.meleeAutoAttack ~= false and self:InMeleeRange() then self:EnsureAutoAttack() end
 
     self:SnapshotBuffs()
     self:SnapshotTargetDebuffs()
@@ -599,6 +647,16 @@ function AutoRota:EvalCommand(msg)
     if cmd == "del" or cmd == "delete" then self:CmdDel(t[2]); return end
     if cmd == "check" then self:CmdCheck(); return end
     if cmd == "reset" then self:CmdReset(); return end
+    if cmd == "acquire" then self:CmdAcquire(t[2]); return end
+    if cmd == "minimap" then
+        if AutoRotaMinimap and AutoRotaMinimap.ToggleShown then
+            local hidden = AutoRotaMinimap:ToggleShown()
+            msgOut("minimap button " .. (hidden and "hidden" or "shown") .. ".")
+        else
+            msgOut("minimap button not available.", 1, 0.5, 0.3)
+        end
+        return
+    end
     if cmd == "debug" then self:Debug(); return end
     if cmd == "talents" then self:Talents(); return end
     if cmd == "trace" then
@@ -618,7 +676,7 @@ function AutoRota:EvalCommand(msg)
         return
     end
 
-    msgOut("commands: ui, list, use, off, new, del, check, reset, debug, talents, trace (plus class commands).")
+    msgOut("commands: ui, list, use, off, new, del, check, reset, acquire, minimap, debug, talents, trace (plus class commands).")
 end
 
 -- ============================================================

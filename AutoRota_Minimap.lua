@@ -1,18 +1,23 @@
 -- ============================================================
--- AutoRota_Minimap  -  draggable minimap button
--- Turtle WoW 1.12 frame API. Opens the shared configuration window
--- (AutoRotaUI:Toggle) on click. Position is stored per character in
--- AutoRotaDB.minimapAngle; visibility in AutoRotaDB.minimapHide.
--- No external libraries: the button rides the minimap edge using plain
--- trig, the same recipe vanilla addons have always used.
+-- AutoRota_Minimap  -  draggable minimap button + addon options
+-- Turtle WoW 1.12 frame API. No external libraries.
+--   * Left-click  : open the class configuration window (AutoRotaUI:Toggle).
+--   * Right-click : open a small options panel (self-targeting toggle plus a
+--                   shortcut to the config window).
+--   * Drag        : ride the minimap edge; position saved per character in
+--                   AutoRotaDB.minimapAngle, visibility in AutoRotaDB.minimapHide.
+-- The button wears the player's class crest, falling back to a cog.
 -- ============================================================
+
+AutoRotaMinimap = {}
+local AM = AutoRotaMinimap
 
 local DEFAULT_ANGLE = 200   -- degrees around the minimap, lower-left by default
 local RADIUS = 80           -- distance from the minimap centre to the button
 
 -- The built-in class crest sheet (4x4 grid, 0.25 steps). We pick the cell
--- matching the player's class so the button wears their class icon, and
--- fall back to a cog for anything unrecognised.
+-- matching the player's class so the button wears their class icon, and fall
+-- back to a cog for anything unrecognised.
 local CLASS_ICON = "Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes"
 local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_Gear_01"
 local CLASS_TCOORDS = {
@@ -27,102 +32,170 @@ local CLASS_TCOORDS = {
     PALADIN = { 0,    0.25, 0.5,  0.75 },
 }
 
-local button = CreateFrame("Button", "AutoRotaMinimapButton", Minimap)
-button:SetWidth(31); button:SetHeight(31)
-button:SetFrameStrata("MEDIUM")
-button:SetFrameLevel(8)
-button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-button:RegisterForDrag("LeftButton")
-
--- icon (set to the class crest at login; cog as a pre-login fallback)
-local icon = button:CreateTexture(nil, "BACKGROUND")
-icon:SetTexture(FALLBACK_ICON)
-icon:SetWidth(20); icon:SetHeight(20)
-icon:SetPoint("TOPLEFT", button, "TOPLEFT", 7, -6)
-
-local function ApplyClassIcon()
-    local _, class = UnitClass("player")
-    local c = class and CLASS_TCOORDS[class]
-    if c then
-        icon:SetTexture(CLASS_ICON)
-        icon:SetTexCoord(c[1], c[2], c[3], c[4])
-    else
-        icon:SetTexture(FALLBACK_ICON)
-        icon:SetTexCoord(0, 1, 0, 1)
-    end
+-- ------------------------------------------------------------
+-- placement, dragging, and the class icon
+-- ------------------------------------------------------------
+local function placeButton()
+    local angle = math.rad((AutoRotaDB and AutoRotaDB.minimapAngle) or DEFAULT_ANGLE)
+    AM.button:ClearAllPoints()
+    AM.button:SetPoint("CENTER", Minimap, "CENTER", RADIUS * math.cos(angle), RADIUS * math.sin(angle))
 end
 
--- the standard circular minimap-button border
-local border = button:CreateTexture(nil, "OVERLAY")
-border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-border:SetWidth(53); border:SetHeight(53)
-border:SetPoint("TOPLEFT", button, "TOPLEFT", 0, 0)
-
-button:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
-
--- ------------------------------------------------------------
--- placement and dragging
--- ------------------------------------------------------------
-local function UpdatePos()
-    local angle = math.rad(AutoRotaDB and AutoRotaDB.minimapAngle or DEFAULT_ANGLE)
-    button:SetPoint("CENTER", Minimap, "CENTER", RADIUS * math.cos(angle), RADIUS * math.sin(angle))
-end
-
-local function DragUpdate()
-    local mx, my = Minimap:GetCenter()
+local function dragUpdate()
+    local cx, cy = Minimap:GetCenter()
     local scale = Minimap:GetEffectiveScale()
     local px, py = GetCursorPosition()
     px = px / scale; py = py / scale
-    AutoRotaDB.minimapAngle = math.deg(math.atan2(py - my, px - mx))
-    UpdatePos()
+    if AutoRotaDB then AutoRotaDB.minimapAngle = math.deg(math.atan2(py - cy, px - cx)) end
+    placeButton()
 end
 
-button:SetScript("OnDragStart", function()
-    this:LockHighlight()
-    this:SetScript("OnUpdate", DragUpdate)
-end)
-button:SetScript("OnDragStop", function()
-    this:UnlockHighlight()
-    this:SetScript("OnUpdate", nil)
-end)
-
--- ------------------------------------------------------------
--- click and tooltip
--- ------------------------------------------------------------
-button:SetScript("OnClick", function()
-    if arg1 == "RightButton" then
-        -- right-click runs the bare rotation, handy while configuring
-        AutoRota:EvalCommand("")
+local function applyClassIcon()
+    local _, class = UnitClass("player")
+    local c = class and CLASS_TCOORDS[class]
+    if c then
+        AM.icon:SetTexture(CLASS_ICON)
+        AM.icon:SetTexCoord(c[1], c[2], c[3], c[4])
     else
-        if not AutoRotaUI then
-            AutoRota:Throttle("UI framework not loaded. AutoRota_UI.lua is missing or mislabeled in your AutoRota folder, reinstall the files.")
-            return
-        end
-        AutoRotaUI:Toggle()
+        AM.icon:SetTexture(FALLBACK_ICON)
+        AM.icon:SetTexCoord(0, 1, 0, 1)
     end
-end)
+end
 
-button:SetScript("OnEnter", function()
-    GameTooltip:SetOwner(this, "ANCHOR_LEFT")
-    GameTooltip:SetText("AutoRota", 1, 0.82, 0)
-    GameTooltip:AddLine("Left-click: open the configuration panel.", 1, 1, 1)
-    GameTooltip:AddLine("Right-click: run the rotation once.", 1, 1, 1)
-    GameTooltip:AddLine("Drag: move around the minimap.", 0.7, 0.7, 0.7)
-    GameTooltip:AddLine("/armap to hide or show this button.", 0.7, 0.7, 0.7)
-    GameTooltip:Show()
-end)
-button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+-- ============================================================
+-- options panel (right-click): addon-wide, non class-specific options
+-- ============================================================
+local function buildPanel()
+    local p = CreateFrame("Frame", "AutoRotaMinimapPanel", UIParent)
+    p:SetWidth(232); p:SetHeight(104)
+    p:SetFrameStrata("DIALOG")
+    p:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 },
+    })
+    p:SetBackdropColor(0, 0, 0, 0.92)
+    p:EnableMouse(true)
+    p:Hide()
 
--- ------------------------------------------------------------
--- initialise: read saved position, class icon, and hide state. Runs at
+    local title = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOPLEFT", 12, -10)
+    title:SetText("AutoRota options")
+
+    local acq = CreateFrame("CheckButton", "AutoRotaMinimapAcquire", p, "UICheckButtonTemplate")
+    acq:SetWidth(22); acq:SetHeight(22)
+    acq:SetPoint("TOPLEFT", 10, -32)
+    local acqLabel = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    acqLabel:SetPoint("LEFT", acq, "RIGHT", 2, 0)
+    acqLabel:SetText("Auto target (acquire nearest enemy)")
+    acq:SetScript("OnClick", function()
+        if AutoRotaDB then AutoRotaDB.acquire = acq:GetChecked() and true or false end
+    end)
+    p.acq = acq
+
+    local hint = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("TOPLEFT", 12, -58)
+    hint:SetText("Off lets a separate assist addon set the target.")
+
+    local cfg = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+    cfg:SetWidth(208); cfg:SetHeight(22)
+    cfg:SetPoint("BOTTOM", 0, 12)
+    cfg:SetText("Open rotation config")
+    cfg:SetScript("OnClick", function()
+        p:Hide()
+        if AutoRotaUI then AutoRotaUI:Toggle() end
+    end)
+
+    AM.panel = p
+end
+
+function AM:TogglePanel()
+    if not self.panel then return end
+    if self.panel:IsShown() then self.panel:Hide(); return end
+    self.panel.acq:SetChecked(not (AutoRotaDB and AutoRotaDB.acquire == false))
+    self.panel:ClearAllPoints()
+    self.panel:SetPoint("TOPRIGHT", self.button, "BOTTOMLEFT", 4, 0)
+    self.panel:Show()
+end
+
+-- ============================================================
+-- the button
+-- ============================================================
+local function buildButton()
+    local b = CreateFrame("Button", "AutoRotaMinimapButton", Minimap)
+    b:SetWidth(31); b:SetHeight(31)
+    b:SetFrameStrata("MEDIUM")
+    b:SetFrameLevel(8)
+    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    b:RegisterForDrag("LeftButton")
+    b:SetMovable(true)
+    AM.button = b
+
+    -- icon (class crest at login; cog as a pre-login fallback)
+    local icon = b:CreateTexture(nil, "BACKGROUND")
+    icon:SetTexture(FALLBACK_ICON)
+    icon:SetWidth(20); icon:SetHeight(20)
+    icon:SetPoint("TOPLEFT", b, "TOPLEFT", 7, -6)
+    AM.icon = icon
+
+    -- the standard circular minimap-button border
+    local border = b:CreateTexture(nil, "OVERLAY")
+    border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+    border:SetWidth(53); border:SetHeight(53)
+    border:SetPoint("TOPLEFT", b, "TOPLEFT", 0, 0)
+
+    b:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+
+    b:SetScript("OnClick", function()
+        if arg1 == "RightButton" then
+            AM:TogglePanel()
+        else
+            if AM.panel then AM.panel:Hide() end
+            if AutoRotaUI then
+                AutoRotaUI:Toggle()
+            else
+                AutoRota:Throttle("UI framework not loaded. AutoRota_UI.lua is missing or mislabeled in your AutoRota folder, reinstall the files.")
+            end
+        end
+    end)
+
+    b:SetScript("OnDragStart", function() this:LockHighlight(); this:SetScript("OnUpdate", dragUpdate) end)
+    b:SetScript("OnDragStop", function() this:UnlockHighlight(); this:SetScript("OnUpdate", nil) end)
+
+    b:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(this, "ANCHOR_LEFT")
+        GameTooltip:SetText("AutoRota", 1, 0.82, 0)
+        GameTooltip:AddLine("Left-click: configure rotation.", 1, 1, 1)
+        GameTooltip:AddLine("Right-click: addon options.", 1, 1, 1)
+        GameTooltip:AddLine("Drag: move around the minimap.", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("/armap or /ar minimap to hide or show.", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+end
+
+-- Show or hide the button, remembered across sessions. Called by /ar minimap
+-- (through the core) and by /armap. Returns the new hidden state.
+function AM:ToggleShown()
+    if type(AutoRotaDB) ~= "table" then AutoRotaDB = {} end
+    AutoRotaDB.minimapHide = not AutoRotaDB.minimapHide
+    if self.button then
+        if AutoRotaDB.minimapHide then self.button:Hide() else self.button:Show() end
+    end
+    return AutoRotaDB.minimapHide
+end
+
+-- ============================================================
+-- initialise: refine saved position, class icon, and hide state. Runs at
 -- ADDON_LOADED and PLAYER_LOGIN so it is robust to reload timing.
--- ------------------------------------------------------------
-local function Init()
+-- ============================================================
+local function init()
     if type(AutoRotaDB) ~= "table" then AutoRotaDB = {} end
     if AutoRotaDB.minimapAngle == nil then AutoRotaDB.minimapAngle = DEFAULT_ANGLE end
-    ApplyClassIcon()
-    UpdatePos()
-    if AutoRotaDB.minimapHide then button:Hide() else button:Show() end
+    applyClassIcon()
+    placeButton()
+    if AutoRotaDB.minimapHide then AM.button:Hide() else AM.button:Show() end
 end
 
 local ev = CreateFrame("Frame")
@@ -131,25 +204,22 @@ ev:RegisterEvent("PLAYER_LOGIN")
 ev:RegisterEvent("PLAYER_ENTERING_WORLD")
 ev:SetScript("OnEvent", function()
     if event == "ADDON_LOADED" and arg1 ~= "AutoRota" then return end
-    Init()
+    init()
 end)
 
--- Anchor and show the button right away with defaults, so it is visible
--- even before the events above fire (some 1.12 clients skip PLAYER_LOGIN on
--- a /reload, and saved variables may not be ready during file execution).
--- Init() then refines the saved position, class icon, and hide state.
-UpdatePos()
-if not (AutoRotaDB and AutoRotaDB.minimapHide) then button:Show() end
+-- Build and anchor the button right away with defaults, so it is visible even
+-- before the events above fire (some 1.12 clients skip PLAYER_LOGIN on a
+-- /reload, and saved variables may not be ready during file execution). init()
+-- then refines the saved position, class icon, and hide state.
+buildButton()
+buildPanel()
+placeButton()
+if not (AutoRotaDB and AutoRotaDB.minimapHide) then AM.button:Show() end
 
--- ------------------------------------------------------------
--- /armap toggles visibility (kept separate from /ar so the core needs
--- no changes; see the note in chat for folding it into /ar instead)
--- ------------------------------------------------------------
+-- /armap toggles visibility (kept as a convenience alongside /ar minimap).
 SLASH_AUTOROTAMAP1 = "/armap"
 SlashCmdList["AUTOROTAMAP"] = function()
-    if type(AutoRotaDB) ~= "table" then AutoRotaDB = {} end
-    AutoRotaDB.minimapHide = not AutoRotaDB.minimapHide
-    if AutoRotaDB.minimapHide then button:Hide() else button:Show() end
+    local hidden = AM:ToggleShown()
     DEFAULT_CHAT_FRAME:AddMessage("AutoRota: minimap button "
-        .. (AutoRotaDB.minimapHide and "hidden (/armap to show)." or "shown."), 1, 0.8, 0)
+        .. (hidden and "hidden (/armap to show)." or "shown."), 1, 0.8, 0)
 end
