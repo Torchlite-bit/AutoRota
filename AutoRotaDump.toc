@@ -1,0 +1,8 @@
+## Interface: 11200
+## Title: AutoRota Data Dumper
+## Notes: Extracts confirmed spell names + spell IDs, the full talent list, and live buff/debuff IDs (Turtle WoW 1.12 / SuperWoW). Companion tool for AutoRota.
+## Author: Subtilizer (Torchlite)
+## Version: 0.1.0
+## SavedVariables: AutoRotaDumpDB
+
+AutoRotaDump.lua
