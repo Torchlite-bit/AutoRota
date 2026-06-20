@@ -1,4 +1,4 @@
-# AutoRota ⚔️ (v0.9.1b)
+# AutoRota ⚔️ (v0.10.0b)
 
 **Smart, Modular Combat Automation for Turtle WoW (1.18.1)**
 
@@ -130,6 +130,21 @@ Shadow/leveling damage and Discipline/Holy healing in one module, switched by a 
 
 ---
 
+### 🪄 Mage `(Beta)`
+
+Frost, Fire, and Arcane in one mode-adaptive module, working from level 1 to raiding — switch specs live with `/ar mode frost|fire|arcane`:
+
+* **Three Specs, One Button:** **Frost** (the kiting / *Icicles* spec and best leveler), **Fire** (Scorch debuff + Fireball burst), or **Arcane** (Rupture upkeep + Arcane Missiles). The panel *Spec* dropdown or `/ar mode` switches between them; every ability is *KnowsSpell*-gated, so a level 1 mage (Fireball, then Frostbolt at ~4) plays correctly and each spell switches itself on as it is trained.
+* **Frost — Kite & Icicles:** *Frostbolt* nuke, *Frost Nova* to root a mob that reaches melee (so you step back and wand), *Cone of Cold* as a close-range slow, and *Ice Barrier* kept up (a shield that also boosts Frost damage). *Icicles* is cast whenever its cooldown is up — the Turtle freeze-reset is handled implicitly: *Frostbite* / *Flash Freeze* keep resetting that cooldown, so the engine fires Icicles in the empowered window automatically. On freeze-immune bosses this lands as `Frost Nova ➔ Icicles ➔ Frostbolt`.
+* **Fire — Debuff & Burst:** *Combustion* on cooldown, *Pyroblast* as a **pull-only opener** (gated to a near-full-health target so it is never a 6-second cast stuck mid-fight), *Scorch* to build and maintain the *Fire Vulnerability* debuff to a configurable stack count, *Fire Blast* on cooldown (the instant / movement / finisher tool), then *Fireball*. A per-target Scorch throttle means *Fireball* still fills if the debuff can't be read.
+* **Arcane — Haste & Upkeep:** keep *Arcane Rupture* on the target, pop *Arcane Power* on cooldown, use *Arcane Surge* **while not hasted** (it is skipped under Arcane Power / MQG, whose haste does not scale its 1.5s GCD), and fill with *Arcane Missiles*.
+* **Leveling "Nuke then Wand":** the golden rule of Vanilla mage leveling — nuke a mob to ~30–50% then **wand it to death** to conserve mana. Below a target-health threshold (default 40%, `/ar wandhp <0-100>`) or a mana floor the rotation finishes with the wand; a **Use wand** toggle and the no-wand auto-fallback mirror the Priest. The `frost` / `fire` / `arcane` presets set wand-finish to 0% for pure caster / raid play.
+* **AoE Mode (`/ar aoe`):** kite-AoE — *Frost Nova* to freeze, *Cone of Cold* to snare, *Icicles*, then *Arcane Explosion* to finish. *Evocation* restores mana when low (in combat, target not about to die), and channels (*Arcane Missiles*, *Icicles*, *Blizzard*, *Evocation*) are never clipped.
+
+> **Verification note:** Turtle's custom spells were confirmed by exact name against the client spell DB (*Icicles*, *Arcane Rupture*, *Arcane Surge*, *Flash Freeze*, *Fire Vulnerability*), but their **proc / stack behaviour is best-effort** — confirm the *Fire Vulnerability* stack debuff, the *Arcane Rupture* buff-vs-debuff, and the MQG haste-buff name in-game with `/ar debug` if something isn't firing. The precise *Frost Nova* / *Cone of Cold* weaving for maximum *Flash Freeze* procs on bosses is a manual micro-optimization the engine approximates by casting *Icicles* on cooldown. **Ground-targeted AoE (*Blizzard*, *Flamestrike*) is not auto-cast** — it needs a cursor click a one-button rotation can't place.
+
+---
+
 ## ⚙️ Installation
 
 1. Download the `AutoRota` folder.
@@ -206,11 +221,12 @@ You can also change profile properties dynamically via chat or macros:
 | `/ar filler <wand/flay/smite>` | *(Priest Only)* Sets the DPS filler — wand conserves mana (the 5-second rule); Mind Flay / Smite spend it. | `/ar filler wand` |
 | `/ar healpower <n>` | *(Paladin & Priest)* Manual +healing override for downranking (0 = auto-read from gear). | `/ar healpower 0` |
 | `/ar curse <alias>` | *(Warlock Only)* Switches the curse on the active profile. | `/ar curse coe` |
-| `/ar mode <auto/ranged/melee>` | *(Hunter Only)* Switches the hunter playstyle (auto = by distance). | `/ar mode auto` |
+| `/ar mode <…>` | *(Hunter, Shaman & Mage)* Switches playstyle/spec — Hunter: `auto/ranged/melee`, Shaman: `enhancement/elemental/tank`, Mage: `frost/fire/arcane`. | `/ar mode frost` |
 | `/ar sting <alias>` | *(Hunter Only)* Sets the maintained sting (`serpent`/`scorpid`/`viper`/`none`). | `/ar sting serpent` |
 | `/ar style <bleed/shred>` | *(Druid Only)* Switches the cat style mid-fight. | `/ar style shred` |
 | `/ar form <cat/bear/caster>` | *(Druid Only)* Sets the preferred combat form (caster = Balance/Moonkin). | `/ar form caster` |
-| `/ar aoe` | *(Warrior, Paladin, Druid & Hunter)* Toggles AoE mode (Cleave + Whirlwind / Consecration / Swipe / Volley + Multi-Shot). | `/ar aoe` |
+| `/ar aoe` | *(Warrior, Paladin, Druid, Hunter & Mage)* Toggles AoE mode (Cleave + Whirlwind / Consecration / Swipe / Volley + Multi-Shot / Frost Nova + Cone of Cold + Arcane Explosion). | `/ar aoe` |
+| `/ar wandhp <0-100>` | *(Mage Only)* Target-health % under which the rotation finishes the mob with the wand (0 = off, cast to death). | `/ar wandhp 40` |
 | `/ar cd <on/elite/off>` | *(Warrior & Hunter)* Sets cooldown usage mode. | `/ar cd elite` |
 | `/ar dance` | *(Warrior Only)* Toggles experimental stance dancing. | `/ar dance` |
 | `/ar spell <alias> <on/off>` | *(Warrior & Hunter)* Flips an ability on the active profile. Paladin uses `/ar spell <profile> <alias> <on/off>`. | `/ar spell ms on` |

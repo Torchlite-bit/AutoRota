@@ -4,6 +4,25 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.10.0b — New class: Mage (Frost / Fire / Arcane) — all nine classes complete 🎉
+
+The ninth and final class lands, so AutoRota now covers every class in the game. The Mage is mode-adaptive (like the Shaman and Hunter) and runs from level 1 to raiding, switching specs live with `/ar mode frost|fire|arcane`.
+
+**Three specs, one button:**
+- **Frost** — the kiting and Turtle *Icicles* spec, and the best leveler. Frostbolt nuke, *Frost Nova* root when a mob reaches melee, *Cone of Cold* close-range slow, *Ice Barrier* upkeep, and *Icicles* cast whenever its cooldown is up. The Turtle freeze-reset is handled implicitly: *Frostbite* / *Flash Freeze* keep resetting the Icicles cooldown, so the engine fires it in the empowered window automatically (`Frost Nova ➔ Icicles ➔ Frostbolt` on bosses).
+- **Fire** — *Combustion* on cooldown, *Pyroblast* as a pull-only opener (gated to a near-full-health target so it is never a 6s cast mid-fight), *Scorch* to build and maintain the *Fire Vulnerability* debuff to a configurable stack count, *Fire Blast* on cooldown, then *Fireball*. A per-target Scorch throttle means Fireball still fills if the debuff cannot be read.
+- **Arcane** — *Arcane Rupture* upkeep on the target, *Arcane Power* burst, *Arcane Surge* while **not** hasted (skipped under Arcane Power / MQG, whose haste does not scale its GCD), and *Arcane Missiles* as the filler.
+
+**Leveling "nuke then wand":** below a target-health threshold (the golden rule, default 40%) or below a mana floor, the rotation finishes the mob with the **wand** to conserve mana. A **Use wand** toggle and the missing-wand auto-fallback mirror the Priest; set wand-finish to 0% (the `frost`/`fire`/`arcane` presets do) for pure caster / raid play. Quick knob: `/ar wandhp <0-100>`.
+
+**AoE mode** (`/ar aoe`): kite-AoE — *Frost Nova* freeze, *Cone of Cold* snare, *Icicles*, then *Arcane Explosion*. Ground-targeted AoE (*Blizzard*, *Flamestrike*) is intentionally **not** auto-cast, since it needs a cursor click a one-button rotation cannot place.
+
+**Everything KnowsSpell-gated** so a level 1 mage (Fireball, then Frostbolt at ~4) plays correctly and each ability switches itself on as it is trained; the profile is never flagged for a not-yet-learned spell. Channels (*Arcane Missiles*, *Icicles*, *Blizzard*, *Evocation*) are protected by a channel watcher, and *Evocation* fires when low on mana, in combat, and the target is not about to die.
+
+All Turtle custom spells were confirmed by exact name against the client spell DB (*Icicles*, *Arcane Rupture*, *Arcane Surge*, *Flash Freeze*, *Fire Vulnerability*). Ships as two files (`Class_Mage.lua`, `Class_Mage_UI.lua`); all 21 Lua files pass the balance check.
+
+---
+
 ## v0.9.1b — Priest wand controls: "Use wand" toggle + wandless fallback
 
 Two refinements to the Priest's 5-second-rule filler.
