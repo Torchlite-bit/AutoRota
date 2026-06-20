@@ -4,6 +4,17 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.10.1b — Hunter: stop casting Serpent Sting on poison-immune mobs
+
+**Fix.** Serpent / Scorpid / Viper Sting are Poison-school effects, so they never land on poison-immune targets — but the rotation was re-applying the sting on a wasted "immune" cast every cycle (once the ~15s upkeep throttle expired) on Mechanicals, Elementals, and the specific immune Undead / bosses. Two layers now prevent that:
+
+- **By creature type (deterministic):** *Mechanical* and *Elemental* are immune to Poison on 1.12, so the sting is skipped outright via `UnitCreatureType` — **zero wasted casts** on golems, clockwork mobs, all fire/water/earth/air elementals, etc. *Undead is **not** blanket-blocked* — only specific undead are poison-immune, so type-blocking the whole type would wrongly skip the many valid undead targets.
+- **Learned (per target, per combat):** if the sting is cast but never shows up on the target, that mob is marked immune and the sting is not re-cast. This automatically catches the immune *Undead* and immune bosses (e.g. Baron Aquanis in Blackfathom Deeps) after a single cast. The learned list is cleared when you leave combat, so it never goes stale.
+
+`/ar trace` now shows `sting=Serpent Sting(immune)` when the current target is being skipped, so you can confirm it's working. *(Note: the creature-type block keys off the English type names, matching the addon's English-locale spell strings; on a localized client the learn layer still covers it after one cast.)*
+
+---
+
 ## v0.10.0b — New class: Mage (Frost / Fire / Arcane) — all nine classes complete 🎉
 
 The ninth and final class lands, so AutoRota now covers every class in the game. The Mage is mode-adaptive (like the Shaman and Hunter) and runs from level 1 to raiding, switching specs live with `/ar mode frost|fire|arcane`.
