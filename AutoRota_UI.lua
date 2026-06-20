@@ -73,7 +73,9 @@ function AutoRotaUI:CreateDropdown(uniqueName, parent, width, onSelect)
     local b = CreateFrame("Button", "ARUI_DD_" .. uniqueName, parent, "UIPanelButtonTemplate")
     b:SetWidth(width); b:SetHeight(22)
     b.onSelect = onSelect; b.options = {}; b.rows = {}
-    local list = CreateFrame("Frame", "ARUI_DD_" .. uniqueName .. "_List", b)
+    -- Parent the popup to the window (not the button) so a body scroll frame
+    -- cannot clip it; it is still anchored under the button below.
+    local list = CreateFrame("Frame", "ARUI_DD_" .. uniqueName .. "_List", self.frame or parent)
     list:SetBackdrop(LIST_BACKDROP); list:SetBackdropColor(0, 0, 0, 0.95)
     list:SetFrameStrata("FULLSCREEN_DIALOG"); list:SetWidth(width)
     list:SetPoint("TOPLEFT", b, "BOTTOMLEFT", 0, 2); list:Hide()
@@ -206,6 +208,145 @@ function AutoRotaUI:CreateSlider(uniqueName, parent, labelText, opts, onChange)
     return s
 end
 
+-- ------------------------------------------------------------
+-- Auto-flow layout + scroll. A class can opt in with M.useScrollLayout = true;
+-- the shell then hosts its body in a scroll frame and hands BuildBody the scroll
+-- CHILD. The layout below is a vertical cursor that creates + places controls and
+-- tracks the running height, so bodies stop hand-coding y offsets. Finish() sizes
+-- the child for the scrollbar.
+-- ------------------------------------------------------------
+local LAY = {
+    TOP_PAD = 8, BOT_PAD = 12,
+    L_PAD = 6, COL2_X = 170, LABEL_W = 40,
+    ROW_H = 26, HEADER_H = 30, DD_H = 30, SLIDER_H = 40, SLIDER_TOP = 16,
+}
+local SCROLL = {
+    WIN_H = 480,       -- compact fixed window height for scroll-layout classes
+    TOP = -142,        -- body region starts here, below the profile/status header
+    BOTTOM_PAD = 44,   -- leaves room for the footer buttons
+    LEFT = 16, WIDTH = 322, BAR_W = 16,
+}
+
+local AutoRotaLayout = {}
+AutoRotaLayout.__index = AutoRotaLayout
+
+function AutoRotaUI:NewLayout(parent)
+    return setmetatable({ ui = self, p = parent, y = -LAY.TOP_PAD, first = true }, AutoRotaLayout)
+end
+
+-- A section header with a divider above it (except the first).
+function AutoRotaLayout:Header(text)
+    if not self.first then divider(self.p, self.y - 2) end
+    self.first = false
+    local fs = FS(self.p, "GameFontNormal", text)
+    fs:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.L_PAD, self.y - 10)
+    color(fs, COL.gold)
+    self.y = self.y - LAY.HEADER_H
+    return fs
+end
+
+-- A single full-width checkbox row. args mirror CreateCheck.
+function AutoRotaLayout:Check(key, label, spell, onChange)
+    local item = self.ui:CreateCheck(key, self.p, label, spell, onChange)
+    item.cb:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.L_PAD, self.y)
+    self.y = self.y - LAY.ROW_H
+    return item
+end
+
+-- Two checkboxes side by side; a/b are {key,label,spell,onChange}.
+function AutoRotaLayout:CheckPair(a, b)
+    local ia = self.ui:CreateCheck(a[1], self.p, a[2], a[3], a[4])
+    ia.cb:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.L_PAD, self.y)
+    local ib = self.ui:CreateCheck(b[1], self.p, b[2], b[3], b[4])
+    ib.cb:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.COL2_X, self.y)
+    self.y = self.y - LAY.ROW_H
+    return ia, ib
+end
+
+-- A full-width slider (label centred above the bar).
+function AutoRotaLayout:Slider(key, label, onChange)
+    local s = self.ui:CreateSlider(key, self.p, label, onChange)
+    s:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.L_PAD + 6, self.y - LAY.SLIDER_TOP)
+    self.y = self.y - LAY.SLIDER_H
+    return s
+end
+
+-- Two sliders side by side; a/b are {key,label,onChange}.
+function AutoRotaLayout:SliderPair(a, b)
+    local sa = self.ui:CreateSlider(a[1], self.p, a[2], a[3])
+    sa:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.L_PAD + 6, self.y - LAY.SLIDER_TOP)
+    local sb = self.ui:CreateSlider(b[1], self.p, b[2], b[3])
+    sb:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.COL2_X, self.y - LAY.SLIDER_TOP)
+    self.y = self.y - LAY.SLIDER_H
+    return sa, sb
+end
+
+-- A label + dropdown on the left, and a checkbox on the right of the same row.
+-- dd = {key,label,width,onChange}; ck = {key,label,spell,onChange}.
+function AutoRotaLayout:DropdownCheck(dd, ck)
+    local lab = FS(self.p, "GameFontNormalSmall", dd.label)
+    lab:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.L_PAD, self.y - 6)
+    local d = self.ui:CreateDropdown(dd.key, self.p, dd.width or 110, dd.onChange)
+    d:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.L_PAD + LAY.LABEL_W, self.y - 2)
+    local item = self.ui:CreateCheck(ck[1], self.p, ck[2], ck[3], ck[4])
+    item.cb:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.COL2_X, self.y)
+    self.y = self.y - LAY.DD_H
+    return d, item
+end
+
+function AutoRotaLayout:Gap(n) self.y = self.y - (n or 8) end
+
+-- Size the scroll child to the content laid out so far; returns the height.
+function AutoRotaLayout:Finish()
+    local h = -self.y + LAY.BOT_PAD
+    self.p:SetHeight(h)
+    return h
+end
+
+-- Build the scroll frame + child + scrollbar inside the window, and return the
+-- child for BuildBody to fill. Mouse wheel and the scrollbar both pan it.
+function AutoRotaUI:MakeScroll(f)
+    local viewH = SCROLL.WIN_H + SCROLL.TOP - SCROLL.BOTTOM_PAD   -- TOP is negative
+
+    local sf = CreateFrame("ScrollFrame", "ARUI_BodyScroll", f)
+    sf:SetPoint("TOPLEFT", f, "TOPLEFT", SCROLL.LEFT, SCROLL.TOP)
+    sf:SetWidth(SCROLL.WIDTH); sf:SetHeight(viewH)
+
+    local child = CreateFrame("Frame", "ARUI_BodyScrollChild", sf)
+    child:SetWidth(SCROLL.WIDTH); child:SetHeight(viewH)
+    sf:SetScrollChild(child)
+
+    local sb = CreateFrame("Slider", "ARUI_BodyScrollBar", f, "UIPanelScrollBarTemplate")
+    sb:SetPoint("TOPLEFT", sf, "TOPRIGHT", 4, -16)
+    sb:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", 4, 16)
+    sb:SetWidth(SCROLL.BAR_W)
+    sb:SetMinMaxValues(0, 0); sb:SetValueStep(20); sb:SetValue(0)
+    sb:SetScript("OnValueChanged", function() sf:SetVerticalScroll(sb:GetValue()) end)
+
+    sf:EnableMouseWheel(true)
+    sf:SetScript("OnMouseWheel", function()
+        local mn, mx = sb:GetMinMaxValues()
+        local v = sb:GetValue() - (arg1 * 28)
+        if v < mn then v = mn elseif v > mx then v = mx end
+        sb:SetValue(v)
+    end)
+
+    self.bodyScroll = sf; self.bodyChild = child; self.bodyScrollBar = sb
+    return child
+end
+
+-- After the body is built, set the scrollbar range from the child height and
+-- hide the bar when everything already fits.
+function AutoRotaUI:UpdateScrollRange()
+    local sf, child, sb = self.bodyScroll, self.bodyChild, self.bodyScrollBar
+    if not (sf and child and sb) then return end
+    local maxScroll = child:GetHeight() - sf:GetHeight()
+    if maxScroll < 0 then maxScroll = 0 end
+    sb:SetMinMaxValues(0, maxScroll)
+    if sb:GetValue() > maxScroll then sb:SetValue(maxScroll) end
+    if maxScroll <= 0 then sb:Hide() else sb:Show() end
+end
+
 
 -- ------------------------------------------------------------
 -- reusable dialog (input and yes/no), avoids StaticPopup quirks
@@ -265,8 +406,9 @@ end
 function AutoRotaUI:Build()
     if self.built then return end
 
+    local scrolled = MOD() and MOD().useScrollLayout
     local f = CreateFrame("Frame", "AutoRotaUIFrame", UIParent)
-    f:SetWidth(380); f:SetHeight((MOD() and MOD().uiHeight) or 520)
+    f:SetWidth(380); f:SetHeight(scrolled and SCROLL.WIN_H or ((MOD() and MOD().uiHeight) or 520))
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     f:SetBackdrop(BACKDROP)
     f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton")
@@ -323,7 +465,15 @@ function AutoRotaUI:Build()
     Tip(self.renBtn, "Rename", "Renames the profile being edited.")
     Tip(self.delBtn, "Delete", "Deletes the profile being edited, after a prompt.")
 
-    if MOD() and MOD().BuildBody then MOD():BuildBody(self, f) end
+    if MOD() and MOD().BuildBody then
+        if scrolled then
+            local child = self:MakeScroll(f)
+            MOD():BuildBody(self, child)
+            self:UpdateScrollRange()
+        else
+            MOD():BuildBody(self, f)
+        end
+    end
 
     self.built = true
 end
