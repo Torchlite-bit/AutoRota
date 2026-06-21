@@ -33,13 +33,13 @@ function M:BuildBody(ui, parent)
         { "wandManaFloor", "Wand below mana", set("wandManaFloor") })
     self.evocAtSlider = L:Slider("evocAt", "Evocate below mana", set("evocAt"))
 
-    L:Header("Frost")
+    self.frostSection = L:Header("Frost")
     self.iceBarrierCB, self.iciclesCB = L:CheckPair(
         { "useIceBarrier", "Ice Barrier", "Ice Barrier", set("useIceBarrier") },
         { "useIcicles", "Icicles", "Icicles", set("useIcicles") })
     self.coneCB = L:Check("useConeOfCold", "Cone of Cold", "Cone of Cold", set("useConeOfCold"))
 
-    L:Header("Fire")
+    self.fireSection = L:Header("Fire")
     self.pyroCB, self.scorchCB = L:CheckPair(
         { "usePyroblast", "Pyroblast", "Pyroblast", set("usePyroblast") },
         { "useScorch", "Scorch", "Scorch", set("useScorch") })
@@ -47,7 +47,7 @@ function M:BuildBody(ui, parent)
         { "useFireBlast", "Fire Blast", "Fire Blast", set("useFireBlast") },
         { "useCombustion", "Combustion", "Combustion", set("useCombustion") })
 
-    L:Header("Arcane")
+    self.arcaneSection = L:Header("Arcane")
     self.ruptureCB, self.surgeCB = L:CheckPair(
         { "useArcaneRupture", "Arcane Rupture", "Arcane Rupture", set("useArcaneRupture") },
         { "useArcaneSurge", "Arcane Surge", "Arcane Surge", set("useArcaneSurge") })
@@ -120,6 +120,13 @@ function M:RefreshBody(ui, buf)
     ui:BindCheck(self.ruptureCB, buf.useArcaneRupture, "Arcane Rupture")
     ui:BindCheck(self.surgeCB, buf.useArcaneSurge, "Arcane Surge")
     ui:BindCheck(self.arcanePowerCB, buf.useArcanePower, "Arcane Power")
+
+    -- Active-spec focus: fade + lock the two specs you are not in. The General
+    -- block (shared cooldowns, wand, evocation) is never dimmed.
+    local m = buf.mode or "frost"
+    self.frostSection:SetDimmed(m ~= "frost")
+    self.fireSection:SetDimmed(m ~= "fire")
+    self.arcaneSection:SetDimmed(m ~= "arcane")
 end
 
 -- Open the shared window for this class.
