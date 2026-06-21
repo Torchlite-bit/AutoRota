@@ -230,11 +230,37 @@ local SCROLL = {
 local AutoRotaLayout = {}
 AutoRotaLayout.__index = AutoRotaLayout
 
-function AutoRotaUI:NewLayout(parent)
-    return setmetatable({ ui = self, p = parent, y = -LAY.TOP_PAD, first = true }, AutoRotaLayout)
+-- A section groups the controls placed under one Header so a class body can dim
+-- the whole block (fade + lock) when its mode is not the active one. This is the
+-- dimming half of the earlier work, with none of the collapsible/fold behaviour.
+local Section = {}
+Section.__index = Section
+function Section:_add(region, interactive)
+    table.insert(self.regions, region)
+    if interactive then table.insert(self.controls, region) end
+end
+function Section:SetDimmed(d)
+    d = d and true or false
+    if self.dimmed == d then return end
+    self.dimmed = d
+    local a = d and 0.4 or 1
+    for i = 1, table.getn(self.regions) do self.regions[i]:SetAlpha(a) end
+    for i = 1, table.getn(self.controls) do self.controls[i]:EnableMouse(not d) end
 end
 
--- A section header with a divider above it (except the first).
+function AutoRotaUI:NewLayout(parent)
+    return setmetatable({ ui = self, p = parent, y = -LAY.TOP_PAD, first = true, sections = {}, cur = nil }, AutoRotaLayout)
+end
+
+-- Record a region (and whether it can take mouse input) into the section being
+-- filled, if any. A no-op before the first Header, so shared controls never dim.
+function AutoRotaLayout:_rec(region, interactive)
+    if self.cur then self.cur:_add(region, interactive) end
+end
+
+-- A section header with a divider above it (except the first). Returns a section
+-- handle: every control placed until the next Header belongs to it, so a class
+-- body can dim the whole block later via section:SetDimmed(true).
 function AutoRotaLayout:Header(text)
     if not self.first then divider(self.p, self.y - 2) end
     self.first = false
@@ -242,13 +268,17 @@ function AutoRotaLayout:Header(text)
     fs:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.L_PAD, self.y - 10)
     color(fs, COL.gold)
     self.y = self.y - LAY.HEADER_H
-    return fs
+    local sec = setmetatable({ regions = { fs }, controls = {}, dimmed = false }, Section)
+    table.insert(self.sections, sec)
+    self.cur = sec
+    return sec
 end
 
 -- A single full-width checkbox row. args mirror CreateCheck.
 function AutoRotaLayout:Check(key, label, spell, onChange)
     local item = self.ui:CreateCheck(key, self.p, label, spell, onChange)
     item.cb:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.L_PAD, self.y)
+    self:_rec(item.cb, true); self:_rec(item.label, false)
     self.y = self.y - LAY.ROW_H
     return item
 end
@@ -259,6 +289,8 @@ function AutoRotaLayout:CheckPair(a, b)
     ia.cb:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.L_PAD, self.y)
     local ib = self.ui:CreateCheck(b[1], self.p, b[2], b[3], b[4])
     ib.cb:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.COL2_X, self.y)
+    self:_rec(ia.cb, true); self:_rec(ia.label, false)
+    self:_rec(ib.cb, true); self:_rec(ib.label, false)
     self.y = self.y - LAY.ROW_H
     return ia, ib
 end
@@ -268,6 +300,7 @@ end
 function AutoRotaLayout:Slider(key, label, opts, onChange)
     local s = self.ui:CreateSlider(key, self.p, label, opts, onChange)
     s:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.L_PAD + 6, self.y - LAY.SLIDER_TOP)
+    self:_rec(s, true)
     self.y = self.y - LAY.SLIDER_H
     return s
 end
@@ -279,6 +312,7 @@ function AutoRotaLayout:SliderPair(a, b)
     sa:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.L_PAD + 6, self.y - LAY.SLIDER_TOP)
     local sb = self.ui:CreateSlider(b[1], self.p, b[2], b[3], b[4])
     sb:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.COL2_X, self.y - LAY.SLIDER_TOP)
+    self:_rec(sa, true); self:_rec(sb, true)
     self.y = self.y - LAY.SLIDER_H
     return sa, sb
 end
@@ -290,6 +324,7 @@ function AutoRotaLayout:Dropdown(key, label, width, onChange)
     lab:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.L_PAD, self.y - 8)
     local d = self.ui:CreateDropdown(key, self.p, width or 150, onChange)
     d:SetPoint("LEFT", lab, "RIGHT", 8, 0)
+    self:_rec(d, true); self:_rec(lab, false)
     self.y = self.y - LAY.DD_H
     return d, lab
 end
@@ -303,6 +338,8 @@ function AutoRotaLayout:DropdownCheck(dd, ck)
     d:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.L_PAD + LAY.LABEL_W, self.y - 2)
     local item = self.ui:CreateCheck(ck[1], self.p, ck[2], ck[3], ck[4])
     item.cb:SetPoint("TOPLEFT", self.p, "TOPLEFT", LAY.COL2_X, self.y)
+    self:_rec(d, true); self:_rec(lab, false)
+    self:_rec(item.cb, true); self:_rec(item.label, false)
     self.y = self.y - LAY.DD_H
     return d, item
 end
