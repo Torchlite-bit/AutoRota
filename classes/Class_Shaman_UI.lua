@@ -22,10 +22,12 @@ function M:BuildBody(ui, parent)
     self.shieldDD = L:Dropdown("shield", "Shield", 150, set("shield"))
     self.shockDD  = L:Dropdown("shock", "Shock", 150, set("shock"))
 
-    L:Header("Abilities")
+    self.meleeSection = L:Header("Melee strikes")
     self.ssCB, self.lsCB = L:CheckPair(
         { "useStormstrike", "Stormstrike", "Stormstrike", set("useStormstrike") },
         { "useLightningStrike", "Lightning Strike", "Lightning Strike", set("useLightningStrike") })
+
+    L:Header("Casting & totems")
     self.lbCB, self.searCB = L:CheckPair(
         { "lbFiller", "Lightning Bolt", "Lightning Bolt", set("lbFiller") },
         { "useSearingTotem", "Searing Totem", "Searing Totem", set("useSearingTotem") })
@@ -99,6 +101,10 @@ function M:RefreshBody(ui, buf)
     ui:BindCheck(self.emCB, buf.useElementalMastery)
     ui:BindCheck(self.blCB, buf.useBloodlust)
     ui:BindCheck(self.tauntCB, buf.useTaunt)
+
+    -- Active-spec focus: melee strikes are dead weight while casting, so fade +
+    -- lock them in Elemental. Enhancement and Tank are both melee, so they stay lit.
+    self.meleeSection:SetDimmed(buf.mode == "elemental")
 end
 
 -- Open the shared window for this class.
