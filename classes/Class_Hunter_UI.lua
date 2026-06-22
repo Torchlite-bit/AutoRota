@@ -22,7 +22,7 @@ function M:BuildBody(ui, parent)
     self.markCB = L:Check("useHuntersMark", "Hunter's Mark", "Hunter's Mark", set("useHuntersMark"))
     self.stingDD = L:Dropdown("sting", "Sting", 180, set("sting"))
 
-    L:Header("Ranged Shots")
+    self.rangedSection = L:Header("Ranged Shots")
     self.steadyCB, self.arcaneCB = L:CheckPair(
         { "useSteadyShot", "Steady Shot", "Steady Shot", set("useSteadyShot") },
         { "useArcaneShot", "Arcane Shot", "Arcane Shot", set("useArcaneShot") })
@@ -37,7 +37,7 @@ function M:BuildBody(ui, parent)
         { "useVolley", "Volley leads AoE", "Volley", set("useVolley") },
         { "useImmolationTrap", "Immolation Trap", "Immolation Trap", set("useImmolationTrap") })
 
-    L:Header("Melee")
+    self.meleeSection = L:Header("Melee")
     self.raptorCB, self.mongooseCB = L:CheckPair(
         { "useRaptorStrike", "Raptor Strike", "Raptor Strike", set("useRaptorStrike") },
         { "useMongooseBite", "Mongoose Bite", "Mongoose Bite", set("useMongooseBite") })
@@ -174,6 +174,12 @@ function M:RefreshBody(ui, buf)
     else
         self.mendSlider:EnableMouse(false); self.mendSlider:SetAlpha(0.35)
     end
+
+    -- Active-spec focus: fade + lock the playstyle you are not in. Auto uses both,
+    -- so neither dims; Ranged dims only in pure Melee and Melee only in pure Ranged.
+    local m = buf.mode or "ranged"
+    self.rangedSection:SetDimmed(m == "melee")
+    self.meleeSection:SetDimmed(m == "ranged")
 end
 
 -- Open the shared window for this class.
