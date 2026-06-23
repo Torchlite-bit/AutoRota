@@ -34,6 +34,21 @@ local function FS(parent, font, text)
     return f
 end
 local function color(fs, c) fs:SetTextColor(c[1], c[2], c[3]) end
+
+-- Standard class colours for the identity-header accent. Keyed by the English
+-- class token from UnitClass; the window always shows the player's own class, so
+-- the player's token gives the right accent. Falls back to gold.
+local CLASS_COLORS = {
+    WARRIOR = {0.78, 0.61, 0.43}, PALADIN = {0.96, 0.55, 0.73},
+    HUNTER  = {0.67, 0.83, 0.45}, ROGUE   = {1.00, 0.96, 0.41},
+    PRIEST  = {1.00, 1.00, 1.00}, SHAMAN  = {0.00, 0.44, 0.87},
+    MAGE    = {0.41, 0.80, 0.94}, WARLOCK = {0.58, 0.51, 0.79},
+    DRUID   = {1.00, 0.49, 0.04},
+}
+local function classColor()
+    local _, token = UnitClass("player")
+    return CLASS_COLORS[token or ""] or COL.gold
+end
 local function trim(s) local r = string.gsub(s or "", "^%s*(.-)%s*$", "%1"); return r end
 
 -- Attach a hover tooltip to any mouse-enabled frame. body lines are optional.
@@ -467,10 +482,63 @@ function AutoRotaUI:Build()
     f:Hide()
     self.frame = f
 
-    local title = FS(f, "GameFontNormalLarge", "AutoRota" .. (MOD() and (" - " .. (MOD().uiTitle or "")) or "")); title:SetPoint("TOP", f, "TOP", 0, -16); color(title, COL.gold)
+    -- Identity header: "AutoRota" in gold, the class name in its class colour as
+    -- an accent, and the version - left-aligned to match the controls below.
+    local brand = FS(f, "GameFontNormalLarge", "AutoRota")
+    brand:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -14); color(brand, COL.gold)
+    local clsName = MOD() and (MOD().uiTitle or "") or ""
+    local cls = FS(f, "GameFontNormalLarge", clsName ~= "" and (" - " .. clsName) or "")
+    cls:SetPoint("LEFT", brand, "RIGHT", 2, 0); color(cls, classColor())
+    local verFS = FS(f, "GameFontDisableSmall", "v" .. (AutoRota.ver or ""))
+    verFS:SetPoint("LEFT", cls, "RIGHT", 8, -1)
     local sub = FS(f, "GameFontDisableSmall", "Pick or create a profile, configure below, then Activate")
-    sub:SetPoint("TOP", f, "TOP", 0, -34)
+    sub:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -34)
     local xb = CreateFrame("Button", nil, f, "UIPanelCloseButton"); xb:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -8)
+
+    -- "?" help button + a toggleable help panel (overlays the window).
+    self.helpBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    self.helpBtn:SetWidth(24); self.helpBtn:SetHeight(22)
+    self.helpBtn:SetPoint("RIGHT", xb, "LEFT", -2, 0)
+    self.helpBtn:SetText("?")
+    self.helpBtn:SetScript("OnClick", function()
+        if self.helpFrame:IsShown() then self.helpFrame:Hide() else self.helpFrame:Show() end
+    end)
+    Tip(self.helpBtn, "Help", "The one-button concept and the /ar commands.")
+
+    local helpText =
+        "|cffFFFFFFAutoRota runs your whole rotation from one key.|r Put |cffFFD100/ar|r " ..
+        "(nothing else) in a macro, drag it to your bar, and press it over and over - " ..
+        "each press fires the best spell for the moment from your active profile.\n\n" ..
+        "|cffFFD100Setup|r\n" ..
+        "|cffFFD100/ar|r - fire the rotation (your one button)\n" ..
+        "|cffFFD100/ar ui|r - open this window\n" ..
+        "|cffFFD100/ar minimap|r - show/hide the minimap button (also |cffFFD100/armap|r)\n\n" ..
+        "|cffFFD100Profiles|r\n" ..
+        "|cffFFD100/ar list|r - list your profiles\n" ..
+        "|cffFFD100/ar use <name>|r - activate a profile\n" ..
+        "|cffFFD100/ar new <name>|r - create a profile\n" ..
+        "|cffFFD100/ar del <name>|r - delete a profile\n" ..
+        "|cffFFD100/ar off|r - stop using any profile\n\n" ..
+        "|cffFFD100Troubleshooting|r\n" ..
+        "|cffFFD100/ar check|r - sanity-check the active profile\n" ..
+        "|cffFFD100/ar reset|r - restore default profiles\n" ..
+        "|cffFFD100/ar debug|r - dump live spell and buff names\n" ..
+        "|cffFFD100/ar trace|r - toggle a per-press log of the rotation\n\n" ..
+        "|cff888888Also /autorota and /pa. Plus class-specific commands.|r"
+
+    local hf = CreateFrame("Frame", "AutoRotaHelpFrame", f)
+    hf:SetWidth(360); hf:SetHeight(358)
+    hf:SetPoint("CENTER", f, "CENTER", 0, 0)
+    hf:SetBackdrop(BACKDROP); hf:SetFrameStrata("DIALOG")
+    hf:EnableMouse(true); hf:Hide()
+    self.helpFrame = hf
+    local ht = FS(hf, "GameFontNormalLarge", "AutoRota - Help"); ht:SetPoint("TOP", hf, "TOP", 0, -14); color(ht, COL.gold)
+    local hbody = FS(hf, "GameFontHighlightSmall", helpText)
+    hbody:SetPoint("TOPLEFT", hf, "TOPLEFT", 16, -42)
+    hbody:SetWidth(328); hbody:SetJustifyH("LEFT"); hbody:SetJustifyV("TOP")
+    local hx = CreateFrame("Button", nil, hf, "UIPanelCloseButton")
+    hx:SetPoint("TOPRIGHT", hf, "TOPRIGHT", -4, -4)
+    hx:SetScript("OnClick", function() hf:Hide() end)
 
     FS(f, "GameFontNormalSmall", "Profile being edited"):SetPoint("TOPLEFT", f, "TOPLEFT", 20, -46)
     self.profileDD = self:CreateDropdown("profile", f, 150, function(v) self:Load(v) end)
