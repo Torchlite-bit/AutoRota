@@ -4,6 +4,34 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.13.1b — Optional damage-weaving for the Druid & Shaman healers
+
+**Feature.** The Restoration Druid and Restoration Shaman can now **weave damage between heals**, matching how the Priest and Paladin heal modes already behave. It is a per-profile toggle (`/ar weave on|off`, default **off**), so the player decides whether downtime goes to DPS or to conserving mana.
+
+- **Only in true downtime.** The weave fires only when **nobody is below the heal threshold** — healing always comes first. On the Shaman it also yields to Water Shield and totem upkeep, so those are never skipped for a nuke.
+- **Enemy-targeted + mana-gated.** It casts only when you have an attackable enemy targeted and your mana is above a floor (`weaveManaFloor`, default 40%), so it can never starve your heals. With no enemy targeted it stays pure-heal.
+- **Per class:** the Druid weaves **Moonfire** (kept up as a DoT) then **Wrath**; the Shaman weaves **Lightning Bolt**. Both are `KnowsSpell`-gated.
+- **Toggle anywhere:** `/ar weave on`, `off`, or bare to flip it. The config panels will expose it as a checkbox plus a mana-floor slider when they land.
+
+Patch bump. All 21 Lua files pass the balance check.
+
+---
+
+## v0.13.0b — Restoration Shaman: the last healer spec
+
+**Feature.** The Shaman gains a fourth mode alongside Enhancement, Elemental, and Tank — a **Restoration** group healer on the same triage engine as the Priest, Paladin, and Druid healers. With it, **every class that can heal now has a one-button healing spec.** Like the others it runs **with no enemy targeted** and heals through SuperWoW's unit-argument cast, so your current target is never dropped.
+
+- **Worst-hurt triage + downranking.** Each press finds the most-hurt *reachable* group member and **downranks Healing Wave** to the size of the deficit, counting its own in-flight heal so it never double-stacks on one unit. Shaman healing is all direct — no HoTs — so this is the leanest of the four heal engines.
+- **Toolkit by priority.** *Mana Tide Totem* when low on mana → **Nature's Swiftness-equivalent → instant max Healing Wave** for a target in trouble → **Lesser Healing Wave** for a fast single-target emergency (this wins over AoE) → *Chain Heal* when several are hurt → downranked *Healing Wave* as the fill. Each step is toggle- or threshold-gated.
+- **Water Shield + totems on autopilot.** Water Shield is kept up (reusing the shield system — the template sets `shield = "water"`), and totems are refreshed on a per-element timer during lulls so upkeep never steals a heal GCD: a **Mana Spring** water staple by default, with earth/fire/air pickers wired and off.
+- **Selectable today.** Pick it with `/ar mode resto` (or `/ar new <name> restoration` for a ready-made profile). A dedicated **config panel** for the heal toggles, sliders, and totem pickers is the next step, alongside the Druid's; until then the template defaults are sensible and the thresholds live in `Class_Shaman.lua`.
+
+> **Heal-tuning note:** As with the Druid, the Healing Wave / Lesser Healing Wave / Chain Heal rank values are vanilla baselines in one block at the top of the Restoration section in `Class_Shaman.lua`. A few names couldn't be confirmed from outside the game and have safe fallbacks: the **NS-equivalent** spell (tries `Nature's Swiftness`, then `Ancestral Swiftness`), **Mana Tide Totem**, and the **totem names** in the picker tables — confirm with `/ar debug` / `/ar talents` if a step isn't firing. Totem re-drop is timer-based (55s water / 110s others — adjust if Turtle durations differ), `HealMods` is ~neutral since the resto tree has no flat +healing% talent (gear `+healing` is the lever), and reach uses the ~28yd proxy.
+
+New spec — minor version bump. All 21 Lua files pass the balance check.
+
+---
+
 ## v0.12.0b — Restoration Druid: a group-healer spec in caster form
 
 **Feature.** The Druid gains a fourth playstyle alongside Cat, Bear, and Balance — a **Restoration** spec that heals the party/raid, built on the same triage engine as the Priest and Paladin healers. Like them it runs **with no enemy targeted**, so it works at range, and it heals through SuperWoW's unit-argument cast so your current target is never dropped.

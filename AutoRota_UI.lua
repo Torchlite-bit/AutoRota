@@ -496,20 +496,17 @@ function AutoRotaUI:Build()
     local xb = CreateFrame("Button", nil, f, "UIPanelCloseButton"); xb:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -8)
 
     -- "?" help button + a toggleable help panel (overlays the window).
-    -- Round "?" button beside the close [X]. Stock 1.12 art has no "?" disc - the
-    -- X button's disc and red X are one fused texture, so a pixel match is not
-    -- possible - so this uses the round action-slot button face (UI-Quickslot2,
-    -- the ring used on the stance/pet bars) for a real beveled disc with proper
-    -- Up/Down/Highlight states, and a gold "?" glyph centered on top.
-    self.helpBtn = CreateFrame("Button", nil, f)
-    self.helpBtn:SetWidth(28); self.helpBtn:SetHeight(28)
-    self.helpBtn:SetPoint("RIGHT", xb, "LEFT", 0, 0)
-    self.helpBtn:SetNormalTexture("Interface\\Buttons\\UI-Quickslot2")
-    self.helpBtn:SetPushedTexture("Interface\\Buttons\\UI-Quickslot-Depress")
-    self.helpBtn:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
-    local qhl = self.helpBtn:GetHighlightTexture(); if qhl then qhl:SetBlendMode("ADD") end
+    -- Built from the SAME UIPanelCloseButton art as the X, so it is a true round
+    -- sibling - identical disc, bevel, hover and press, same 32x32 size. 1.12 bakes
+    -- the disc and its symbol into one texture and an addon cannot add new art, so
+    -- the red X cannot be deleted outright; the close art is muted to a neutral
+    -- disc and a bold gold "?" is drawn on top.
+    self.helpBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    self.helpBtn:SetPoint("RIGHT", xb, "LEFT", 6, 0)
+    local hn = self.helpBtn:GetNormalTexture();  if hn then hn:SetVertexColor(0.6, 0.6, 0.6) end
+    local hp = self.helpBtn:GetPushedTexture();  if hp then hp:SetVertexColor(0.6, 0.6, 0.6) end
     local qfs = self.helpBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    qfs:SetPoint("CENTER", self.helpBtn, "CENTER", 0, 0)
+    qfs:SetPoint("CENTER", self.helpBtn, "CENTER", 0, 1)
     qfs:SetText("?"); qfs:SetTextColor(1.0, 0.82, 0.0)
     self.helpBtn.fs = qfs
     self.helpBtn:SetScript("OnClick", function()
