@@ -38,6 +38,9 @@ function M:BuildBody(ui, parent)
         { "useBloodlust", "Bloodlust", "Bloodlust", set("useBloodlust") })
     self.tauntCB = L:Check("useTaunt", "Earthshaker taunt", "Earthshaker Slam", set("useTaunt"))
 
+    self.restoSection = L:Header("Restoration (Heal)")
+    self.weaveCB = L:Check("weaveDamage", "Weave damage between heals", nil, set("weaveDamage"))
+
     L:Finish()
 
     ui:Tip(self.modeDD, "Mode", "Enhancement (melee), Elemental (caster), or Tank.", "Each press runs the rotation for the selected mode.")
@@ -50,6 +53,7 @@ function M:BuildBody(ui, parent)
     ui:Tip(self.emCB.cb, "Elemental Mastery", "Pop before a nuke for a guaranteed crit (feeds Clearcasting and Electrify). Off the global cooldown.")
     ui:Tip(self.blCB.cb, "Bloodlust", "Self melee/cast haste burst (Turtle: self-only). Used in combat when off cooldown.")
     ui:Tip(self.tauntCB.cb, "Earthshaker Slam", "Tank taunt, cast only when the target is not already attacking you. Requires a shield.")
+    ui:Tip(self.weaveCB.cb, "Weave damage", "Restoration only. When nobody needs healing and you have an enemy targeted, cast Lightning Bolt in the downtime.", "Mana-gated so it never starves heals. Off by default - same as /ar weave on|off.")
 end
 
 -- ============================================================
@@ -61,8 +65,9 @@ function M:RefreshBody(ui, buf)
         { label = "Enhancement", value = "enhancement" },
         { label = "Elemental",   value = "elemental" },
         { label = "Tank",        value = "tank" },
+        { label = "Restoration", value = "restoration" },
     }
-    local modeLabel = { enhancement = "Enhancement", elemental = "Elemental", tank = "Tank" }
+    local modeLabel = { enhancement = "Enhancement", elemental = "Elemental", tank = "Tank", restoration = "Restoration" }
     local mcur = buf.mode or "enhancement"
     ui:SetDropdown(self.modeDD, modeOpts, mcur, modeLabel[mcur] or mcur, ui.COL.white)
 
@@ -101,10 +106,12 @@ function M:RefreshBody(ui, buf)
     ui:BindCheck(self.emCB, buf.useElementalMastery)
     ui:BindCheck(self.blCB, buf.useBloodlust)
     ui:BindCheck(self.tauntCB, buf.useTaunt)
+    ui:BindCheck(self.weaveCB, buf.weaveDamage)
+    self.restoSection:SetDimmed(buf.mode ~= "restoration")
 
-    -- Active-spec focus: melee strikes are dead weight while casting, so fade +
-    -- lock them in Elemental. Enhancement and Tank are both melee, so they stay lit.
-    self.meleeSection:SetDimmed(buf.mode == "elemental")
+    -- Active-spec focus: melee strikes are dead weight while casting or healing, so
+    -- fade + lock them in Elemental and Restoration. Enhancement and Tank stay lit.
+    self.meleeSection:SetDimmed(buf.mode == "elemental" or buf.mode == "restoration")
 end
 
 -- Open the shared window for this class.

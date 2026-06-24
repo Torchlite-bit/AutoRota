@@ -47,6 +47,9 @@ function M:BuildBody(ui, parent)
         { "useInsectSwarm", "Insect Swarm", "Insect Swarm", set("useInsectSwarm") })
     self.eclipseCB = L:Check("eclipse", "Eclipse reaction", nil, set("eclipse"))
 
+    self.restoSection = L:Header("Restoration (Heal)")
+    self.weaveCB = L:Check("weaveDamage", "Weave damage between heals", nil, set("weaveDamage"))
+
     L:Header("Defense (HP management)")
     self.hpCB = L:Check("hpManage", "Bear Form when HP is low", nil, set("hpManage"))
     self.hpLowSlider, self.hpHighSlider = L:SliderPair(
@@ -73,6 +76,7 @@ function M:BuildBody(ui, parent)
     ui:Tip(self.mfCB.cb, "Moonfire", "Kept up first. At low levels this plus the nuke IS the rotation.")
     ui:Tip(self.isCB.cb, "Insect Swarm", "Kept up right after Moonfire.")
     ui:Tip(self.eclipseCB.cb, "Eclipse reaction", "On a proc, cast the empowered opposite nuke. Casts are queued, so the swap lands the moment the window opens.", "If procs are not detected, run /ar debug with the proc up and report the buff name.")
+    ui:Tip(self.weaveCB.cb, "Weave damage", "Restoration only. When nobody needs healing and you have an enemy targeted, cast Moonfire + Wrath in the downtime.", "Mana-gated so it never starves heals. Off by default - same as /ar weave on|off.")
     ui:Tip(self.hpCB.cb, "Defensive Bear", "Below the lower value, force Bear Form (using Frenzied Regeneration when known) until HP is back at the upper value.", "Works from any form, including mid-fight in Cat or Moonkin. Inert until Bear Form is learned.")
     ui:Tip(self.hpLowSlider, "Switch below", "Going under this HP percent shifts you into Bear.")
     ui:Tip(self.hpHighSlider, "Back above", "Reaching this HP percent releases you back to the preferred form.")
@@ -86,8 +90,9 @@ function M:RefreshBody(ui, buf)
         { label = "Cat Form",  value = "cat" },
         { label = "Bear Form", value = "bear" },
         { label = "Caster / Moonkin", value = "caster" },
+        { label = "Restoration (Heal)", value = "tree" },
     }
-    local formLabel = { cat = "Cat Form", bear = "Bear Form", caster = "Caster / Moonkin" }
+    local formLabel = { cat = "Cat Form", bear = "Bear Form", caster = "Caster / Moonkin", tree = "Restoration (Heal)" }
     local fcur = buf.form or "cat"
     ui:SetDropdown(self.formDD, formOpts, fcur, formLabel[fcur] or fcur, ui.COL.white)
 
@@ -125,6 +130,8 @@ function M:RefreshBody(ui, buf)
     ui:BindCheck(self.mfCB, buf.useMoonfire)
     ui:BindCheck(self.isCB, buf.useInsectSwarm)
     ui:BindCheck(self.eclipseCB, buf.eclipse)
+    ui:BindCheck(self.weaveCB, buf.weaveDamage)
+    self.restoSection:SetDimmed((buf.form or "cat") ~= "tree")
 
     -- defense block: needs a bear form; sliders follow the checkbox
     local bearKnown = self:KnowsSpell("Bear Form") or self:KnowsSpell("Dire Bear Form")
