@@ -496,10 +496,22 @@ function AutoRotaUI:Build()
     local xb = CreateFrame("Button", nil, f, "UIPanelCloseButton"); xb:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -8)
 
     -- "?" help button + a toggleable help panel (overlays the window).
-    self.helpBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    self.helpBtn:SetWidth(24); self.helpBtn:SetHeight(22)
-    self.helpBtn:SetPoint("RIGHT", xb, "LEFT", -2, 0)
-    self.helpBtn:SetText("?")
+    -- Round "?" button beside the close [X]. Stock 1.12 art has no "?" disc - the
+    -- X button's disc and red X are one fused texture, so a pixel match is not
+    -- possible - so this uses the round action-slot button face (UI-Quickslot2,
+    -- the ring used on the stance/pet bars) for a real beveled disc with proper
+    -- Up/Down/Highlight states, and a gold "?" glyph centered on top.
+    self.helpBtn = CreateFrame("Button", nil, f)
+    self.helpBtn:SetWidth(28); self.helpBtn:SetHeight(28)
+    self.helpBtn:SetPoint("RIGHT", xb, "LEFT", 0, 0)
+    self.helpBtn:SetNormalTexture("Interface\\Buttons\\UI-Quickslot2")
+    self.helpBtn:SetPushedTexture("Interface\\Buttons\\UI-Quickslot-Depress")
+    self.helpBtn:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+    local qhl = self.helpBtn:GetHighlightTexture(); if qhl then qhl:SetBlendMode("ADD") end
+    local qfs = self.helpBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    qfs:SetPoint("CENTER", self.helpBtn, "CENTER", 0, 0)
+    qfs:SetText("?"); qfs:SetTextColor(1.0, 0.82, 0.0)
+    self.helpBtn.fs = qfs
     self.helpBtn:SetScript("OnClick", function()
         if self.helpFrame:IsShown() then self.helpFrame:Hide() else self.helpFrame:Show() end
     end)

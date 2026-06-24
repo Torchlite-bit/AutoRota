@@ -1,4 +1,4 @@
-# AutoRota ⚔️ (v0.11.2b)
+# AutoRota ⚔️ (v0.12.0b)
 
 **Smart, Modular Combat Automation for Turtle WoW (1.18.1)**
 
@@ -74,11 +74,12 @@ A full DoT, survival, execute, and pet kit — working from level 1:
 
 ### 🐾 Druid `(Beta)`
 
-Cat (DPS), Bear (Tank), and Balance (Caster/Moonkin) in one form-adaptive engine — working from level 1:
+Cat (DPS), Bear (Tank), Balance (Caster/Moonkin), and now **Restoration** (group healer) in one form-adaptive engine — working from level 1:
 
 * **Form-Adaptive Rotation:** Each press follows the form you are actually in — Cat Form runs the DPS rotation, Bear/Dire Bear runs the tank rotation, Moonkin (or a *Caster/Moonkin* preference) runs the Balance rotation, and caster form shifts you into your profile's preferred form (panel dropdown or `/ar form cat|bear|caster`). One profile, one macro, every job.
 * **Level 1 and Up:** Before any combat form is learned (Bear at 10, Cat at 20), the caster rotation carries the character — Moonfire upkeep plus Wrath is exactly the right early-leveling loop — and the profile grows into its form automatically the moment it is trained.
 * **Balance / Eclipse Weaving:** Keeps *Moonfire* and *Insect Swarm* up, then chain-casts your primary nuke (Wrath or Starfire) to fish for **Eclipse** procs and swaps to the empowered opposite nuke the instant one fires. Nukes are queued through SuperWoW, so spamming never clips a cast — the press during your current cast lines up the buffed spell for the moment the proc window opens. Entering Moonkin (when learned) is automatic for the mana discount.
+* **Restoration (Group Healer):** A `resto` spec turns the Druid into a party/raid healer that runs **with no enemy targeted** (so it works at range) and heals via SuperWoW's unit-argument cast without dropping your current target. It picks the most-hurt *reachable* member and **downranks Healing Touch** to the size of the deficit for mana efficiency (counting its own in-flight heal so it never double-stacks, with `+healing` factored through *Gift of Nature*). The full toolkit fires by priority: *Innervate* when low on mana, **Nature's Swiftness → instant max Healing Touch** for a target in real trouble, *Swiftmend* for a no-cast top-up off your own Rejuv/Regrowth, *Regrowth* for a big single-target burst, *Rejuvenation* kept rolling at its best affordable rank, and optional *Wild Growth* (AoE) and *Lifebloom*. Select it with `/ar form resto` (or `/ar new <name> tree` for a ready-made profile). *(Heals in caster form — the rotation drops any active shapeshift first; **Tree of Life auto-shift is off for now**, pending its 1.18.1 cast rules. A dedicated config panel is the next step — until then the `tree` template defaults apply and the thresholds live in `Class_Druid.lua`.)*
 * **Defensive Bear (HP Management):** Optional hysteresis safety net, same design as the Paladin's resource sliders — drop below your low threshold (default 35%) and the rotation forces Bear Form from **any** form, fires *Frenzied Regeneration* on cooldown, and keeps tanking the mob down behind bear armor; climb back over your high threshold (default 70%) and it releases you to your preferred form automatically. Off by default and inert until Bear Form is learned.
 * **Two Turtle Cat Styles:** *Claw & Bleed* keeps *Rake* and *Rip* rolling and builds with *Claw* (pairs with bleed-energy talents like *Ancient Brutality*); *Shred & Powershift* builds with *Shred* and finishes with *Ferocious Bite* for bleed-immune bosses (MC/BWL). Swap mid-fight with `/ar style bleed|shred`.
 * **Smart Finishers:** At your combo threshold the bleed style applies *Rip* if it is not ticking and spends *Ferocious Bite* while it is — combo points are never dumped into a redundant bleed.
@@ -233,7 +234,7 @@ You can also change profile properties dynamically via chat or macros:
 | `/ar mode <…>` | *(Hunter, Shaman & Mage)* Switches playstyle/spec — Hunter: `auto/ranged/melee`, Shaman: `enhancement/elemental/tank`, Mage: `frost/fire/arcane`. | `/ar mode frost` |
 | `/ar sting <alias>` | *(Hunter Only)* Sets the maintained sting (`serpent`/`scorpid`/`viper`/`none`). | `/ar sting serpent` |
 | `/ar style <bleed/shred>` | *(Druid Only)* Switches the cat style mid-fight. | `/ar style shred` |
-| `/ar form <cat/bear/caster>` | *(Druid Only)* Sets the preferred combat form (caster = Balance/Moonkin). | `/ar form caster` |
+| `/ar form <cat/bear/caster/resto>` | *(Druid Only)* Sets the preferred form/spec (caster = Balance/Moonkin, resto = group healer). | `/ar form resto` |
 | `/ar aoe` | *(Warrior, Paladin, Druid, Hunter & Mage)* Toggles AoE mode (Cleave + Whirlwind / Consecration / Swipe / Volley + Multi-Shot / Frost Nova + Cone of Cold + Arcane Explosion). | `/ar aoe` |
 | `/ar wandhp <0-100>` | *(Mage Only)* Target-health % under which the rotation finishes the mob with the wand (0 = off, cast to death). | `/ar wandhp 40` |
 | `/ar cd <on/elite/off>` | *(Warrior & Hunter)* Sets cooldown usage mode. | `/ar cd elite` |

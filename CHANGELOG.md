@@ -4,6 +4,21 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.12.0b — Restoration Druid: a group-healer spec in caster form
+
+**Feature.** The Druid gains a fourth playstyle alongside Cat, Bear, and Balance — a **Restoration** spec that heals the party/raid, built on the same triage engine as the Priest and Paladin healers. Like them it runs **with no enemy targeted**, so it works at range, and it heals through SuperWoW's unit-argument cast so your current target is never dropped.
+
+- **Worst-hurt triage + downranking.** Each press finds the most-hurt *reachable* group member and **downranks Healing Touch** to the size of the deficit for mana efficiency, counting its own in-flight heal so it never double-stacks on one unit. The `+healing` bonus is a profile value, factored through *Gift of Nature*.
+- **Full Resto toolkit, by priority.** *Innervate* yourself when low on mana → **Nature's Swiftness → instant max Healing Touch** for a target in real trouble → *Swiftmend* for a no-cast top-up when your Rejuv/Regrowth is already on the unit → *Wild Growth* when several are hurt (off by default) → *Regrowth* for a big single-target burst → *Rejuvenation* kept rolling at its best affordable rank → *Lifebloom* (off by default) → downranked *Healing Touch* as the fill. Each step is toggle- or threshold-gated.
+- **Caster-form healing.** Heals only cast in caster form, so the rotation drops any active shapeshift first. **Tree of Life auto-shift is intentionally left off** until its 1.18.1 cast rules are confirmed — it heals in caster form for now.
+- **Selectable today.** Pick it with `/ar form resto` (or `/ar new <name> tree` for a ready-made profile from the Restoration template). A dedicated **config panel** for the heal toggles and sliders is the next step; until then the template defaults are sensible and the thresholds are adjustable in `Class_Druid.lua`.
+
+> **Heal-tuning note:** The per-rank Healing Touch / Regrowth / Rejuvenation values are vanilla baselines and live in one block at the top of the Restoration section in `Class_Druid.lua` — the downranker only needs the ranks ordered roughly right, but adjust them there if a pick over- or under-heals on 1.18.1. HoT upkeep rides a per-unit reapply timer rather than a buff read (raid buff readback is unreliable on this client), and healing range uses the ~28yd interact-distance proxy. Worth a quick in-party sanity check.
+
+New spec — minor version bump. All 21 Lua files pass the balance check.
+
+---
+
 ## v0.11.2b — Hunter Serpent Sting now fires and stays up
 
 **Fix.** Serpent Sting was unreliable-to-nonexistent in the ranged rotation — the Hunter would apply Hunter's Mark, fire Arcane Shot and Auto Shot, and skip the sting, only landing it at random. Several stacked causes, now all addressed:
