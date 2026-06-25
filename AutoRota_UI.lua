@@ -496,14 +496,14 @@ function AutoRotaUI:Build()
     local xb = CreateFrame("Button", nil, f, "UIPanelCloseButton"); xb:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -8)
 
     -- "?" help button + a toggleable help panel (overlays the window).
-    -- Uses the game's real Help-button art (UI-MicroButton-Help, the "?" from the
-    -- main menu bar) - a clean, unmistakable "?" button. It sits directly UNDER the
-    -- close [X], matched to the X's 32x32 footprint so the two line up in the corner.
+    -- Custom icons live in the addon's Icons\ subfolder; this pulls the gold "?"
+    -- (Icons\Help.tga, 32x32 so the power-of-two-only 1.12 client loads it). It
+    -- sits just left of the close [X].
     self.helpBtn = CreateFrame("Button", nil, f)
-    self.helpBtn:SetWidth(20); self.helpBtn:SetHeight(40)
-    self.helpBtn:SetPoint("TOP", xb, "BOTTOM", -1, 18)
-    self.helpBtn:SetNormalTexture("Interface\\Buttons\\UI-MicroButton-Help-Up")
-    self.helpBtn:SetPushedTexture("Interface\\Buttons\\UI-MicroButton-Help-Down")
+    self.helpBtn:SetWidth(26); self.helpBtn:SetHeight(26)
+    self.helpBtn:SetPoint("RIGHT", xb, "LEFT", 2, 0)
+    self.helpBtn:SetNormalTexture("Interface\\AddOns\\AutoRota\\Icons\\Help")
+    self.helpBtn:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
     local qhl = self.helpBtn:GetHighlightTexture(); if qhl then qhl:SetBlendMode("ADD") end
     self.helpBtn:SetScript("OnClick", function()
         if self.helpFrame:IsShown() then self.helpFrame:Hide() else self.helpFrame:Show() end
