@@ -4,6 +4,24 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.14.0b — Full heal-config panels for the Druid & Shaman healers (plus UI polish)
+
+**Feature.** The **Restoration Druid** and **Restoration Shaman** now have **complete config panels**, matching every other spec — every knob the heal rotation reads is a slider, toggle, or dropdown, so the healers are no longer command-line-plus-defaults. This closes the last big configurability gap.
+
+- **Restoration Druid — all controls.** A master **Heal threshold** and **Heal power** (your `+healing` for downranks), then on/off toggles with their thresholds for **Innervate** (mana %), **Nature's Swiftness** (HP %), **Swiftmend** (HP %), and **Regrowth** (HP %); a **Wild Growth** toggle + ally-count, the **damage-weave** toggle + mana floor, and **Rejuvenation** / **Lifebloom** toggles.
+- **Restoration Shaman — all controls.** The same **Heal threshold** + **Heal power**, then toggles with thresholds for **Mana Tide** (mana %), **Nature's Swiftness** (HP %), **Lesser Healing Wave** (HP %), and **Chain Heal** (ally-count); the **damage-weave** toggle + mana floor; a **Maintain totems** master toggle; and the four **totem pickers** (Water / Earth / Fire / Air) populated from the real totem tables.
+- **Honest about what will actually fire.** Checkboxes reflect the *rotation's* defaults, not just the stored value — abilities that default on show checked even on a profile that never saved them. Each slider and totem picker greys out unless you are on-spec, its toggle is on, **and** the spell is learned (including the dual-named **Nature's / Ancestral Swiftness**, and a red "(not learned)" on any totem you have picked but cannot cast yet).
+- **Off-spec stays out of the way.** The whole Restoration section dims and locks unless the profile's spec is Restoration (Druid form = Restoration, Shaman mode = Restoration), exactly as before — the controls just fill it in now.
+
+**UI polish (all nine panels).** Two shared touches that ride along on every class window:
+
+- **Engraved section dividers.** The flat grey separators are now a soft two-tone hairline with a thin shadow beneath, for a bit of depth.
+- **Row hover.** Moving over a config control lights a faint full-width highlight on its row. It is a background tint that never takes mouse input (so it can never block a click), and tooltips now chain onto it rather than replacing it.
+
+The per-rank heal values and thresholds remain the vanilla-baseline approximations from the earlier resto work — the panels make them tunable; whether they *feel* right is still an in-game call (the rank tables live at the top of `Class_Druid.lua` / `Class_Shaman.lua`). All 21 Lua files pass the balance check.
+
+---
+
 ## v0.13.3b — Custom help-button icon + an Icons folder for bundled art
 
 **Change.** The config window's "?" help button now uses a **bundled custom icon** instead of stock UI art — a gold "?" that reads cleanly beside the close button. Custom textures now live in the addon's new **`Icons\`** subfolder.
