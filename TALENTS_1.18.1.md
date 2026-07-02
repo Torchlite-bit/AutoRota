@@ -4,6 +4,12 @@ Authoritative talent-name dictionary, extracted in-game via `/ar talents`. These
 are the exact `GetTalentInfo` strings for the 1.18.1 client. **Use these spellings
 for any name-based talent detection** in the class modules.
 
+> Live calculators for cross-checking: [Warrior](https://talents.turtlecraft.gg/warrior) ·
+> [Paladin](https://talents.turtlecraft.gg/paladin) · [Hunter](https://talents.turtlecraft.gg/hunter) ·
+> [Rogue](https://talents.turtlecraft.gg/rogue) · [Priest](https://talents.turtlecraft.gg/priest) ·
+> [Shaman](https://talents.turtlecraft.gg/shaman) · [Mage](https://talents.turtlecraft.gg/mage) ·
+> [Warlock](https://talents.turtlecraft.gg/warlock) · [Druid](https://talents.turtlecraft.gg/druid)
+
 ## Scope — what this dictionary does and does not verify
 
 - ✅ **Talent names** (passive/active talents in the three trees per class). Authoritative.

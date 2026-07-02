@@ -1,4 +1,4 @@
-# AutoRota ⚔️ (v0.14.0b)
+# AutoRota ⚔️ (v0.13.4b)
 
 **Smart, Modular Combat Automation for Turtle WoW (1.18.1)**
 
@@ -160,7 +160,7 @@ Frost, Fire, and Arcane in one mode-adaptive module, working from level 1 to rai
 ### ⚠️ Required
 * :crystal_ball: **`SuperWoW (v1.5.1)`**
   Unlocks advanced client capabilities and expanded Lua functionality for modern addons.
-  ↳ [SuperWoW Release](https://github.com/balakethelock/SuperWoW/releases/tag/Release) | [SuperAPI Addon](https://github.com/balakethelock/SuperAPI)
+  ↳ [SuperWoW Release](https://github.com/balakethelock/SuperWoW/releases/tag/Release) | [Features Wiki](https://github.com/balakethelock/SuperWoW/wiki/Features) | [SuperAPI Addon](https://github.com/balakethelock/SuperAPI)
 
 * :zap: **`NamPower (v4.6.1)`**
   Handles text enhancement and native spell-queuing for smoother combat rotations.
@@ -173,8 +173,6 @@ Frost, Fire, and Arcane in one mode-adaptive module, working from level 1 to rai
 * 🏗️ **`SuperCleveRoid Macros`**
   Enhanced macro addon for World of Warcraft 1.12.1 (Vanilla/Turtle WoW) with dynamic tooltips, conditional execution, and extended syntax.
   ↳ [SuperCleveRoidMacros](https://github.com/jrc13245/SuperCleveRoidMacros) | [SuperCleveRoid Macro Wiki](https://github.com/jrc13245/SuperCleveRoidMacros/wiki)
-
-Note: It is recommended to use the `SuperCleveRoidMacros` (SCRM) addon, but this is not required.
 
 ---
 
