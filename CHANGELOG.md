@@ -4,6 +4,20 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.13.12b — Shaman totems in every spec, cast-event-driven re-drops, Warrior fixes
+
+**Feature.** Totem maintenance is no longer Restoration-only, and re-drop timing is upgraded from a blind clock to real cast confirmation. A Warrior auto-attack bug is also fixed, with two new leveling toggles.
+
+- **Totems across every spec.** Enhancement, Elemental, and Tank now maintain the full four-element totem set during a lull, exactly like Restoration always has. The picker section moved out of the Restoration-only card into a shared **Totems** section visible on every tab.
+- **Searing Totem folded into the fire-totem picker.** The old standalone *Searing Totem* toggle is retired — it was a second system fighting the fire-totem selector over the same slot. Damage specs now default their fire pick to Searing (Enhancement, Elemental), so nothing is lost, and the double-drop risk is gone. New per-spec totem defaults: Enhancement (Windfury / Searing / Strength / Mana Spring), Elemental (Grace of Air / Searing / Mana Spring), Tank (Stoneskin / Grounding / Mana Spring).
+- **Cast-event-driven re-drop timing.** Totem upkeep now listens for SuperWoW's `UNIT_CASTEVENT`, which fires the instant a cast registers, and timestamps each element slot from the actual cast rather than assuming Queue succeeded. A manual re-drop, or Mana Tide bumping the water slot, now correctly resets that slot's clock. Falls back cleanly on clients without the event.
+- **Warrior: reliable auto-attack.** `EnsureAutoAttack` required the *Attack* ability to be placed on an action bar to detect and toggle it — if it wasn't, no swing ever started. It now falls back to starting the swing directly when no Attack slot is found, so melee always engages without a manual `/startattack`.
+- **Warrior: Charge and Rend leveling toggles (both off by default).** *Charge* opens a pull from range in Battle Stance; the client blocks it once you're in combat, so it only ever fires as the initial gap-close, never mid-fight. *Rend* keeps its bleed up in Battle or Defensive Stance and steps aside during *Execute* so rage funnels there instead. Both are registered `/ar spell` aliases (`charge`, `rend`).
+
+All Lua files pass the balance check; the define-before-use ordering audit is clean.
+
+---
+
 ## v0.13.11b — Single-row layout across every class, uniform sliders, aligned dropdowns
 
 **Layout.** The concept's single-row anatomy — piloted on Druid in 0.13.10b — is now the layout for **all nine class panels**. Every setting sits on one line: toggle, label, an optional muted sub-label, a right-aligned slider, and a fixed right-hand value column, with hairline separators between rows. Confirmed in-game on the 1.18.1 client.
