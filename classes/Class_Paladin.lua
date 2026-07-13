@@ -138,31 +138,32 @@ M.templates = {
         seals = { debuff = "", damage = "Seal of Righteousness" },
         manaManage = false, manaLow = 30, manaHigh = 70,
         hpManage = false, hpLow = 30, hpHigh = 70,
-        strikeMode = "auto",
-        spells = { holyShield = false, hammerOfWrath = false, repentance = false },
+        strikeStyle = "autodps",
+        spells = { holyStrike = false, crusaderStrike = false, holyShield = false, hammerOfWrath = false, repentance = false },
     },
     retri = {
         seals = { debuff = "Seal of the Crusader", damage = "Seal of Righteousness" },
         manaManage = false, manaLow = 30, manaHigh = 70,
         hpManage = false, hpLow = 30, hpHigh = 70,
-        strikeMode = "auto",
-        spells = { holyShield = false, hammerOfWrath = false, repentance = false },
+        strikeStyle = "autodps",
+        spells = { holyStrike = true, crusaderStrike = true, holyShield = false, hammerOfWrath = false, repentance = false },
     },
     prot = {
         seals = { debuff = "Seal of the Crusader", damage = "Seal of Righteousness" },
         manaManage = false, manaLow = 30, manaHigh = 70,
         hpManage = false, hpLow = 30, hpHigh = 70,
-        strikeMode = "auto",
-        spells = { holyShield = true, hammerOfWrath = false, repentance = false },
+        strikeStyle = "tankblock",
+        spells = { holyStrike = true, crusaderStrike = true, holyShield = true, hammerOfWrath = false, repentance = false },
     },
-    heal = {  -- group healer: heals the party/raid, judges Seal of Wisdom for mana
-        seals = { debuff = "Seal of Wisdom", damage = "" },
+    heal = {  -- group healer: heals the party/raid, keeps Seal of Wisdom for mana
+        seals = { debuff = "", damage = "" },
         manaManage = false, manaLow = 30, manaHigh = 70,
         hpManage = false, hpLow = 30, hpHigh = 70,
-        strikeMode = "off",
-        spells = { holyShield = false, hammerOfWrath = false, repentance = false },
+        strikeStyle = "autodps",
+        spells = { holyStrike = false, crusaderStrike = false, holyShield = false, hammerOfWrath = false, repentance = false },
         healMode = true, healThreshold = 90, useHolyShock = true, holyShockPct = 50, healPower = 0,
-        healWeaveStrikes = true, healWeaveManaFloor = 40,
+        healWeaveManaFloor = 40, healReloadCS = true, healSplashHS = true,
+        healManaSelf = true, healManaJudge = false,
     },
 }
 
@@ -177,6 +178,8 @@ M.sealAlias = {
 }
 
 M.spellAlias = {
+    holystrike = "holyStrike", hs = "holyStrike",
+    crusaderstrike = "crusaderStrike", cs = "crusaderStrike",
     holyshield = "holyShield",
     hammer = "hammerOfWrath", how = "hammerOfWrath",
     repentance = "repentance", rep = "repentance",
@@ -184,13 +187,15 @@ M.spellAlias = {
     exorcism = "exorcism", exo = "exorcism",
 }
 
--- Strike-mode aliases for /ar strike <mode>
-M.strikeModeAlias = {
+-- Optional /ar strike <what> aliases. The UI is the primary control; this is a
+-- thin convenience for macros. off/hs/cs set the two strike toggles; auto/tank
+-- set both toggles on and pick the both-on strategy.
+M.strikeCmdAlias = {
     off = "off", none = "off",
-    auto = "auto",
-    cs = "cs", crusader = "cs",
     hs = "hs", holy = "hs",
-    hscs = "hscs", ["holy-cs"] = "hscs",
+    cs = "cs", crusader = "cs",
+    auto = "auto", dps = "auto",
+    tank = "tank", block = "tank",
 }
 
 -- Fills any missing field with a default and migrates old-format profiles
@@ -204,17 +209,27 @@ function M:NormalizeProfile(c)
 
     c.spells = c.spells or {}
 
-    -- Migrate the old per-strike checkboxes into the strikeMode dropdown, then
-    -- drop the dead keys. Both on -> auto, one on -> that one, both off -> off.
-    if c.strikeMode == nil and (c.spells.holyStrike ~= nil or c.spells.crusaderStrike ~= nil) then
+    -- Strike model: two toggles (holyStrike / crusaderStrike) plus a strategy
+    -- (strikeStyle) that only matters when BOTH are on. Migrate forward from the
+    -- interim strikeMode dropdown (off/auto/cs/hs/hscs), which had replaced the
+    -- original two toggles, so both old save formats land here correctly.
+    if c.spells.holyStrike == nil or c.spells.crusaderStrike == nil then
         local hs, cs = c.spells.holyStrike, c.spells.crusaderStrike
-        if hs and cs then c.strikeMode = "auto"
-        elseif hs then c.strikeMode = "hs"
-        elseif cs then c.strikeMode = "cs"
-        else c.strikeMode = "off" end
+        if c.strikeMode ~= nil then
+            local m = c.strikeMode
+            if m == "off"      then hs, cs = false, false
+            elseif m == "cs"   then hs, cs = false, true
+            elseif m == "hs"   then hs, cs = true, false
+            else                    hs, cs = true, true    -- auto / hscs / unknown
+            end
+        end
+        c.spells.holyStrike     = (hs == true)
+        c.spells.crusaderStrike = (cs == true)
     end
-    c.spells.holyStrike = nil
-    c.spells.crusaderStrike = nil
+    -- Strategy for when both strikes are enabled: autodps | tankblock.
+    if c.strikeStyle == nil then c.strikeStyle = "autodps" end
+    c.strikeMode = nil   -- retire the interim dropdown field
+    c.prioZeal = nil     -- retired: its logic now lives inside "autodps"
 
     local sk = { "holyShield", "hammerOfWrath", "repentance", "consecration", "exorcism" }
     for i = 1, table.getn(sk) do
@@ -231,17 +246,25 @@ function M:NormalizeProfile(c)
     if c.hpLow  == nil then c.hpLow  = 30 end
     if c.hpHigh == nil then c.hpHigh = 70 end
     if c.sealTwist == nil then c.sealTwist = false end
-    if c.strikeMode == nil then c.strikeMode = "auto" end   -- auto | cs | hs | hscs
-    if c.prioZeal == nil then c.prioZeal = false end
     if c.strikeDownrank == nil then c.strikeDownrank = false end
     -- Healing support (merged). Roleless: healMode alone drives heal behavior.
-    if c.healMode == nil then c.healMode = false end
+    -- Coerce to a strict boolean. This also repairs any profile corrupted by the
+    -- old tab bug, which could store the string "damage" (truthy) into healMode.
+    c.healMode = (c.healMode == true)
     if c.healThreshold == nil then c.healThreshold = 90 end
     if c.useHolyShock == nil then c.useHolyShock = true end
     if c.holyShockPct == nil then c.holyShockPct = 50 end
-    if c.healWeaveStrikes == nil then c.healWeaveStrikes = true end     -- melee-holy weave
+    -- Split the old single heal-weave toggle into two independent behaviours
+    -- (CS reload of Holy Shock, and Holy Strike filler), then retire it.
+    if c.healReloadCS == nil then c.healReloadCS = (c.healWeaveStrikes ~= false) end
+    if c.healSplashHS == nil then c.healSplashHS = (c.healWeaveStrikes ~= false) end
+    c.healWeaveStrikes = nil
     if c.healWeaveManaFloor == nil then c.healWeaveManaFloor = 40 end
     if c.healPower == nil then c.healPower = 0 end
+    -- Heal-mode mana upkeep. Self seal defaults on (free sustain); the group
+    -- judge defaults off because it spends a GCD that cannot be a heal.
+    if c.healManaSelf  == nil then c.healManaSelf  = true  end
+    if c.healManaJudge == nil then c.healManaJudge = false end
     return c
 end
 
@@ -298,18 +321,19 @@ end
 -- ============================================================
 -- Strikes
 -- ============================================================
--- Strikes are on whenever the mode is not "off" and at least one strike is
--- known. Which strikes are usable is decided purely by KnowsSpell, so the mode
--- dropdown is the single enable + style control.
+-- Which strikes the profile enables, and whether they are actually learned.
+-- Gating on the two toggles (not just KnowsSpell) is what makes "only Holy
+-- Strike" or "only Crusader Strike" mean exactly that.
+function M:HSOn(cfg) return cfg.spells.holyStrike     and self:KnowsSpell("Holy Strike")     end
+function M:CSOn(cfg) return cfg.spells.crusaderStrike and self:KnowsSpell("Crusader Strike") end
+
 function M:StrikeEnabled(cfg)
-    if (cfg.strikeMode or "auto") == "off" then return false end
-    return self:KnowsSpell("Holy Strike") or self:KnowsSpell("Crusader Strike")
+    return (self:HSOn(cfg) or self:CSOn(cfg)) and true or false
 end
 
 function M:SharedStrikeReady(cfg)
-    if (cfg.strikeMode or "auto") == "off" then return false end
-    if self:KnowsSpell("Holy Strike")     and self:IsReady("Holy Strike")     then return true end
-    if self:KnowsSpell("Crusader Strike") and self:IsReady("Crusader Strike") then return true end
+    if self:HSOn(cfg) and self:IsReady("Holy Strike")     then return true end
+    if self:CSOn(cfg) and self:IsReady("Crusader Strike") then return true end
     return false
 end
 
@@ -391,64 +415,62 @@ function M:CastStrike(name, cfg)
     return self:Cast(name)
 end
 
--- Opener: the first strike on a fresh target. Auto gets Holy Might up first if
--- the talent makes it work, else opens by the tanking lean (weapon/threat).
-function M:ResolveOpener(cfg)
-    local m = cfg.strikeMode or "auto"
-    if m == "cs" then return "Crusader Strike" end
-    if m == "hs" or m == "hscs" then return "Holy Strike" end
-    if self:HolyMightWorthwhile() then return "Holy Strike" end   -- ret: get Holy Might rolling
-    if self:AutoLeansHoly() then return "Holy Strike" end          -- tank: threat opener
-    return "Crusader Strike"                                       -- leveling/dps: just build Zeal
-end
-
--- Filler lean once both buffs are maintained: "holy" or "crusader".
-function M:ResolveFiller(cfg)
-    local m = cfg.strikeMode or "auto"
-    if m == "cs" or m == "hscs" then return "crusader" end
-    if m == "hs" then return "holy" end
-    if self:AutoLeansHoly() then return "holy" end                 -- tanking leans Holy Strike
-    return "crusader"
-end
-
+-- The single strike chosen for this shared-cooldown window. Gated on the two
+-- toggles, so a single enabled strike is used exclusively; only when BOTH are
+-- enabled does the strategy (autodps | tankblock) decide the mix.
 function M:ResolveSharedCD(cfg)
-    local hs = self:KnowsSpell("Holy Strike")
-    local cs = self:KnowsSpell("Crusader Strike")
+    local hs = self:HSOn(cfg)
+    local cs = self:CSOn(cfg)
     if hs and cs then
-        -- Opener: fire the chosen first strike once per fresh target.
-        local id = self:TargetId()
-        if id ~= self.strikeTargetId then
-            self.strikeTargetId = id
-            self.strikeOpened = false
-        end
-        if not self.strikeOpened then
-            self.strikeOpened = true
-            return self:ResolveOpener(cfg)
-        end
-
-        local hmt = self:BuffTime("Holy Might")
-        local zt, zc = self:BuffTime("Zeal")
-
-        -- Optionally rush Zeal to full stacks before anything else.
-        if cfg.prioZeal and zc < ZEAL_STACKS then return "Crusader Strike" end
-
-        -- Maintain Holy Might ONLY if a talent makes Holy Strike apply it,
-        -- so a leveling paladin never burns globals on a buff it cannot get.
-        if self:HolyMightWorthwhile() and hmt < HM_RENEW then return "Holy Strike" end
-
-        -- Keep Zeal built and rolling.
-        if zc < ZEAL_STACKS then return "Crusader Strike" end
-        if zt < ZEAL_RENEW then return "Crusader Strike" end
-
-        -- Filler lean.
-        if self:ResolveFiller(cfg) == "holy" then return "Holy Strike" end
-        return "Crusader Strike"
+        if (cfg.strikeStyle or "autodps") == "tankblock" then return self:ResolveTankBlock(cfg) end
+        return self:ResolveAutoDPS(cfg)
     elseif hs then
         return "Holy Strike"
     elseif cs then
         return "Crusader Strike"
     end
     return nil
+end
+
+-- Auto DPS ladder, talent-aware. Without Vengeful Strikes, Holy Strike grants
+-- no Holy Might, so the ladder just builds Zeal on Crusader Strike and otherwise
+-- swings Holy Strike (which still returns mana and health to the group). With
+-- the talent, Holy Might is kept up, Zeal is ramped to three stacks, and if BOTH
+-- buffs are about to fall in the same window Zeal wins - losing three stacks
+-- costs more than a one-GCD Holy Might refresh.
+function M:ResolveAutoDPS(cfg)
+    local zt, zc = self:BuffTime("Zeal")
+
+    if not self:HolyMightWorthwhile() then
+        -- Pre-talent (leveling): Crusader Strike to three Zeal, then Holy Strike
+        -- unless Zeal is about to expire.
+        if zc < ZEAL_STACKS then return "Crusader Strike" end
+        if zt < ZEAL_RENEW  then return "Crusader Strike" end
+        return "Holy Strike"
+    end
+
+    -- Talented: keep Holy Might up and Zeal at three stacks.
+    local hmt = self:BuffTime("Holy Might")
+    if hmt <= 0 then return "Holy Strike" end            -- opener / lost it: get Holy Might rolling
+
+    if zc < ZEAL_STACKS then                             -- still ramping Zeal
+        if hmt < HM_RENEW then return "Holy Strike" end  -- but refresh Holy Might if it is about to drop
+        return "Crusader Strike"
+    end
+
+    -- Zeal is full: maintenance. Zeal wins ties (three stacks are precious).
+    if zt  < ZEAL_RENEW then return "Crusader Strike" end
+    if hmt < HM_RENEW  then return "Holy Strike"     end
+    return "Holy Strike"                                 -- filler tops Holy Might, adds mana and heal
+end
+
+-- Tank, both strikes on: keep the Crusader Strike block buff (Zealous Defense,
+-- consumed on the next block) loaded, and spend every other window on Holy
+-- Strike for threat. Re-applying Crusader Strike while the buff is still up
+-- would waste it, so Holy Strike takes those windows.
+function M:ResolveTankBlock(cfg)
+    if not self:HasBuff("Zealous Defense") then return "Crusader Strike" end
+    return "Holy Strike"
 end
 
 -- True if the configured debuff is up on the current target, with a short memory
@@ -761,46 +783,76 @@ end
 -- Melee-holy strike weaving (heal mode). Turtle's Holy paladin fights in
 -- melee: Holy Strike splash-heals the group, and with Blessed Strikes
 -- (100% at 5/5) Crusader Strike resets Holy Shock, keeping the emergency
--- instant permanently loaded. Both entry points share this gate.
+-- instant permanently loaded. These are two independent behaviours, each on
+-- its own toggle, because each cast spends a global cooldown.
 -- ------------------------------------------------------------
-function M:HealStrikeGate(cfg)
-    if cfg.healWeaveStrikes == false then return false end
+function M:HealMeleeReady(cfg)
     if not (UnitExists("target") and not UnitIsDead("target") and UnitCanAttack("player", "target")) then return false end
     if not self:InMeleeRange() then return false end
     if not self:GcdReady() then return false end
-    if not self:SharedStrikeReady(cfg) then return false end
-    local maxm = UnitManaMax("player")
-    if not maxm or maxm == 0 then return false end
-    if UnitMana("player") / maxm * 100 < (cfg.healWeaveManaFloor or 40) then return false end
     return true
 end
 
--- The Blessed Strikes engine: when Holy Shock is on cooldown, weave Crusader
--- Strike to reset it - even between heals while people are hurt - but NEVER
--- while anyone is below the Holy Shock emergency line; a critical member
--- always gets the heal first. Auto-detects the talent, so an untalented
--- paladin never burns a GCD fishing for a reset that cannot happen.
+-- True when the Crusader Strike -> Holy Shock reset can actually work.
+function M:BlessedReloadUsable()
+    return self:TalentRank(TALENT_BLESSED) > 0
+        and self:KnowsSpell("Crusader Strike")
+        and self:KnowsSpell("Holy Shock")
+end
+
+-- Toggle A - Reload Holy Shock (CS): when Holy Shock is on cooldown, weave
+-- Crusader Strike to reset it (Blessed Strikes), keeping the emergency instant
+-- loaded. Runs even between heals while people are hurt, but NEVER while anyone
+-- is below the Holy Shock emergency line - a critical member gets the heal
+-- first. Not gated by the filler mana floor, since keeping the emergency loaded
+-- is the priority. Auto-detects the talent.
 function M:HealStrikeEngine(cfg)
+    if not cfg.healReloadCS then return false end
     if not cfg.useHolyShock then return false end
-    if self:TalentRank(TALENT_BLESSED) == 0 then return false end
-    if not self:KnowsSpell("Holy Shock") or not self:KnowsSpell("Crusader Strike") then return false end
+    if not self:BlessedReloadUsable() then return false end
     if self:OwnCDReady("Holy Shock") then return false end          -- already loaded
+    if not self:IsReady("Crusader Strike") then return false end
     local _, _, pct = self:WorstHurt((cfg.healThreshold or 90) / 100)
     if pct and pct <= (cfg.holyShockPct or 50) / 100 then return false end
-    if not self:HealStrikeGate(cfg) then return false end
+    if not self:HealMeleeReady(cfg) then return false end
     return self:CastStrike("Crusader Strike", cfg)
 end
 
--- Downtime weave: nobody needs a direct heal, so strike with the heal-mode
--- policy - Holy Strike when known (its splash heal tops the melee group,
--- doubled by Blessed Strikes), Crusader Strike otherwise.
+-- Toggle B - Holy Strike filler: in downtime with nobody to heal, strike so the
+-- Holy Strike splash tops the melee group (Crusader Strike only as a fallback
+-- before Holy Strike is trained). Gated by its own mana floor, so the filler
+-- never starves a heal. Each cast is a GCD, hence its own opt-in.
 function M:HealWeaveStrike(cfg)
-    if not self:HealStrikeGate(cfg) then return false end
+    if not cfg.healSplashHS then return false end
+    if not self:HealMeleeReady(cfg) then return false end
+    local maxm = UnitManaMax("player")
+    if not maxm or maxm == 0 then return false end
+    if UnitMana("player") / maxm * 100 < (cfg.healWeaveManaFloor or 40) then return false end
     local pick
     if self:KnowsSpell("Holy Strike") then pick = "Holy Strike"
     elseif self:KnowsSpell("Crusader Strike") then pick = "Crusader Strike" end
-    if not pick then return false end
+    if not pick or not self:IsReady(pick) then return false end
     return self:CastStrike(pick, cfg)
+end
+
+-- Heal-mode mana upkeep. Keeps Seal of Wisdom up so melee swings return mana to
+-- you, and optionally judges it once per mob (Judgement of Wisdom) so the whole
+-- group gets mana back. Only worthwhile in melee on an attackable mob. Heals
+-- always preempt this above, so it never runs while anyone needs healing - but
+-- the group judge still spends a GCD, hence it is opt-in.
+function M:HealSeals(cfg)
+    if not (cfg.healManaSelf or cfg.healManaJudge) then return false end
+    if not self:KnowsSpell("Seal of Wisdom") then return false end
+    if not (UnitExists("target") and not UnitIsDead("target") and UnitCanAttack("player", "target")) then return false end
+    if not self:InMeleeRange() then return false end
+    -- Seal of Wisdom must be up (both the self-mana and the judge need it).
+    if not self:HasBuff("Seal of Wisdom") then return self:Cast("Seal of Wisdom") end
+    -- Stamp Judgement of Wisdom on the mob once, if the group judge is enabled.
+    if cfg.healManaJudge and self:KnowsSpell("Judgement") and self:IsReady("Judgement")
+        and not self:DebuffEffectivelyUp("Seal of Wisdom") then
+        return self:Cast("Judgement")
+    end
+    return false
 end
 
 function M:Rotate(cfg)
@@ -825,6 +877,7 @@ function M:Rotate(cfg)
     if cfg.healMode then
         if self:HealDemand(cfg) then return end
         if self:HealWeaveStrike(cfg) then return end
+        if self:HealSeals(cfg) then return end
     end
 
     if self.trace then
@@ -841,7 +894,9 @@ function M:Rotate(cfg)
                 .. " dmg=" .. (cfg.seals.damage ~= "" and cfg.seals.damage or "-")
                 .. " range=" .. (self:InMeleeRange() and "Y" or "N")
                 .. " swing=" .. (self:SwingTimeLeft() and string.format("%.2fs", self:SwingTimeLeft()) or "-"),
-            "mode=" .. (cfg.strikeMode or "auto")
+            "hsOn=" .. (self:HSOn(cfg) and "Y" or "N")
+                .. " csOn=" .. (self:CSOn(cfg) and "Y" or "N")
+                .. " style=" .. (cfg.strikeStyle or "autodps")
                 .. " HS(k=" .. (self:KnowsSpell("Holy Strike") and "Y" or "N")
                 .. ",R=" .. self:EffectiveStrikeRank("Holy Strike", cfg) .. "/" .. self:MaxRank("Holy Strike") .. ")"
                 .. " CS(k=" .. (self:KnowsSpell("Crusader Strike") and "Y" or "N")
@@ -884,8 +939,9 @@ function M:Rotate(cfg)
         and self:KnowsSpell("Consecration") and self:IsReady("Consecration") then
         if self:Cast("Consecration") then return end
     end
-    -- 3. Seal upkeep and judgement
-    if self:HandleSeals(cfg) then return end
+    -- 3. Seal upkeep and judgement (damage/tank mode only; heal mode runs its
+    -- own Seal of Wisdom upkeep via HealSeals above)
+    if not cfg.healMode and self:HandleSeals(cfg) then return end
     -- 4. Hammer of Wrath as execute
     if cfg.spells.hammerOfWrath and self:TargetHPPct() <= 20 and self:IsReady("Hammer of Wrath") then
         if self:Cast("Hammer of Wrath") then return end
@@ -931,14 +987,30 @@ function M:CmdAoe()
     msgOut("Consecration " .. (cfg.spells.consecration and "on (AoE)" or "off") .. ".")
 end
 
--- Set the strike mode on the active profile (off/auto/cs/hs/hscs), for macros.
+-- Optional macro helper: set the strikes on the active profile. off = both off,
+-- hs = only Holy Strike, cs = only Crusader Strike, auto = both on + Auto DPS,
+-- tank = both on + Tank (block, then aggro). The UI is the primary control.
 function M:CmdStrike(alias)
     local cfg = AutoRota:GetActiveProfile()
     if not cfg then msgOut("no profile active.", 1, 0.5, 0.3); return end
-    local mode = self.strikeModeAlias[string.lower(alias or "")]
-    if not mode then msgOut("usage: /ar strike off|auto|cs|hs|hscs", 1, 0.5, 0.3); return end
-    cfg.strikeMode = mode
-    msgOut("strike mode = " .. mode .. ".")
+    local what = self.strikeCmdAlias[string.lower(alias or "")]
+    if not what then msgOut("usage: /ar strike off|hs|cs|auto|tank", 1, 0.5, 0.3); return end
+    cfg.spells = cfg.spells or {}
+    if what == "off" then
+        cfg.spells.holyStrike, cfg.spells.crusaderStrike = false, false
+    elseif what == "hs" then
+        cfg.spells.holyStrike, cfg.spells.crusaderStrike = true, false
+    elseif what == "cs" then
+        cfg.spells.holyStrike, cfg.spells.crusaderStrike = false, true
+    elseif what == "auto" then
+        cfg.spells.holyStrike, cfg.spells.crusaderStrike, cfg.strikeStyle = true, true, "autodps"
+    elseif what == "tank" then
+        cfg.spells.holyStrike, cfg.spells.crusaderStrike, cfg.strikeStyle = true, true, "tankblock"
+    end
+    local both = cfg.spells.holyStrike and cfg.spells.crusaderStrike
+    msgOut("strikes -> HS " .. (cfg.spells.holyStrike and "on" or "off")
+        .. ", CS " .. (cfg.spells.crusaderStrike and "on" or "off")
+        .. (both and (", style " .. (cfg.strikeStyle or "autodps")) or "") .. ".")
 end
 
 -- ============================================================
