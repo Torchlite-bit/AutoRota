@@ -141,9 +141,20 @@ from the polish backlog if built.
   expiry timers.
 - **Heal-engine dedupe**: unify the four near-identical heal engines
   (Paladin/Priest/Druid/Shaman) into one shared module; class modules pass config in.
+- **Weapon-enchant awareness (SuperWoW 2.1 `GetWeaponEnchantID(unit)`)**: add a shared helper
+  that reports whether a temporary main-hand/off-hand enchant is active, so the engine can
+  react to imbue/poison/oil/stone uptime. Primary targets: **Enhancement Shaman** (Windfury/
+  Rockbiter/Flametongue/Frostbrand imbue upkeep), **Rogue** (poison-as-enchant uptime),
+  **Warrior/any** (sharpening-stone / mana-oil upkeep). Build the *detection helper* and its
+  enchant-ID → meaning mapping in this phase (non-rotation plumbing, no gate). **Actually
+  wiring it into any class's ability priority is a ROTATION change → goes through the Phase 1
+  audit-and-report sign-off first.** Guard behind `if GetWeaponEnchantID then ...` so clients
+  on older SuperWoW degrade cleanly; confirm the function exists on the live Turtle build
+  before relying on it (see `docs/dependencies.md`).
 
 **Benchmark:** one shared heal engine passes all four healers' tests; a killed totem
-triggers a re-drop within one frame.
+triggers a re-drop within one frame; the weapon-enchant helper correctly reports imbue
+presence on a test character (Shaman imbue on/off, Rogue poison on/off).
 
 ---
 

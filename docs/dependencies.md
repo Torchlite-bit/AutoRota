@@ -38,7 +38,53 @@ metadata. This is the backbone of Aegis's targeting and cast detection.
 - SuperWoW's presence is the gate for `UNIT_CASTEVENT` and `SpellInfo`; Aegis already guards
   registration with `if SpellInfo then ...` so a client without SuperWoW degrades instead of
   erroring. Keep that pattern.
-- Feature reference: https://github.com/balakethelock/SuperWoW/wiki/Features
+
+**Version detection:** SuperWoW exposes globals **`SUPERWOW_VERSION`** and
+**`SUPERWOW_STRING`** (added in 1.2). Gate any version-specific function (e.g. the 2.1
+`GetWeaponEnchantID` below) behind a presence check on the FUNCTION itself
+(`if GetWeaponEnchantID then ...`) rather than trusting a version string — Turtle bundles its
+own SuperWoW build and the number may not track upstream exactly. Aegis targets Turtle
+1.18.1's bundled SuperWoW; **confirm which functions actually exist on the live client before
+relying on them.**
+
+**Version history relevant to Aegis** (from the SuperWoW wiki Changelog; 2.1 is user-provided
+and not yet independently confirmed against the wiki as of this writing):
+
+*2.0 (July 2026) — confirmed from wiki Changelog:*
+- `CastSpellByName(spell, "CLICK")` — second arg `"CLICK"` instantly casts a reticle/ground
+  spell at the mouseover location, bypassing the targeting-circle step. (Useful later for
+  ground-targeted totems/traps/AoE without a manual click — but a rotation change, so gated.)
+- `TrackUnit` / `UntrackUnit` split (was one function); `UntrackUnit("all")` clears all unit
+  tracking.
+- `UnitNameplate("unit")` → returns the nameplate frame for a unit.
+- `CanLootUnit("unit")` → whether a unit has loot.
+- Player-state helpers: **`IsSwimming()`, `IsMounted()`, `IsIndoors()`, `GetSpeed()`**
+  (`GetSpeed` returns run/swim speed in yards/sec; 7 yds = 100% move speed). Potentially handy
+  for gating (e.g. don't try to melee while mounted/swimming) — non-rotation gates are fine to
+  use; anything altering ability priority is gated.
+- World/cursor position: `CursorPosition()`, `GetWorldLocMapPosition`, `GetMapPositionWorldLoc`,
+  `GetMapBoundaries`. (Not combat-relevant for Aegis.)
+- Nameplate/chat-bubble CVars (`NameplateRange`, `NameplateMotion` 0/1/2, `ChatBubbleRange`,
+  `HealingText`, etc.) and `CREATE_CHATBUBBLE` event. (Not combat-relevant.)
+
+*2.1 (15/07/2026) — USER-PROVIDED (record, verify on client before use):*
+- **`GetWeaponEnchantID(unit)` → mainhand, offhand temporary enchant IDs.** ⭐ **This is the
+  rotation-relevant one.** It lets the engine detect whether a *temporary* weapon enchant is
+  currently active — Windfury/Rockbiter/Flametongue/Frostbrand imbues (Shaman), sharpening/
+  weightstones and mana/wizard oils, and poisons-as-enchant (Rogue). Candidate uses (all
+  gated behind the rotation-audit sign-off): Enhancement Shaman imbue-uptime checks, Rogue
+  poison-uptime awareness, Warrior/any-class stone/oil upkeep. See roadmap "Weapon-enchant
+  awareness" item. Returns an ID (not a name) — Aegis would map known imbue/poison enchant IDs
+  to meaning, or just test presence/change.
+- `GetSendMailItemLink()`, `GetInboxItemLink(itemIndex)` — mail item hyperlinks. (Not
+  combat-relevant.)
+- `GetQuestID(questIndex)`, `GetQuestLink(questID)` — questlog ID + hyperlink (fills client
+  cache from server, fires `QUEST_LOG_UPDATE` on a cache miss). Tooltip `SetHyperlink` now
+  supports quest links. (Not combat-relevant.)
+- NameplateMotion Smart Spread improvements.
+
+- Feature reference: https://github.com/balakethelock/SuperWoW/wiki/Features ·
+  Changelog: https://github.com/balakethelock/SuperWoW/wiki/Changelog
 
 ---
 

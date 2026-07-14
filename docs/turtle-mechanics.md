@@ -20,6 +20,17 @@ client can differ from stock 1.12.
 Primary sources: Turtle WoW Wiki (turtle-wow.fandom.com), forum.turtle-wow.org /
 forum.turtlecraft.gg theorycraft threads, r/turtlewow, community class guides.
 
+**Spell / talent / item database (for exact IDs, ranks, cooldowns, coefficients):**
+- Tortoise-WoW DB viewer: https://xian55.github.io/tortoise-db-viewer/ (a JS single-page app —
+  browse it in a browser; a raw fetch only returns the empty shell).
+- Backing data repos (static files — fetchable/greppable directly, better for pulling exact
+  numbers into code/docs): database `https://github.com/Penqle/tortoise-wow`, viewer source
+  `https://github.com/Xian55/tortoise-db-viewer`.
+- Use these to replace `[?]` "needs verification" numbers in `docs/rotations.md` with exact
+  values (spell IDs for `SpellInfo` matching, cooldowns, DoT durations, spell-power
+  coefficients) — but Turtle rebalances via patches, so confirm against the live client for
+  anything the engine depends on.
+
 ## Paladin (largest divergence)
 - **Offensive Holy Shock REMOVED**; Holy Shock is heal-only (row 5). Old ranged "Shockadin"
   intentionally removed.
