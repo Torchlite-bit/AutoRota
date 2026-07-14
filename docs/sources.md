@@ -15,18 +15,18 @@ and don't trust the wrong source.
 
 | Source | Fetchable by Claude Code? | Use it for | Last verified |
 |---|---|---|---|
-| `TALENTS_1_18_1.md` (in repo root) | ✅ It's a committed file | **Talent trees / spec talent data — THE talent source of truth** | (repo) |
+| `docs/TALENTS_1_18_1.md` | ✅ It's a committed file | **Talent trees / spec talent data — THE talent source of truth** | (repo) |
 | SuperWoW **Changelog** wiki — https://github.com/balakethelock/SuperWoW/wiki/Changelog | ✅ Fetches cleanly | Dependency updates (SuperWoW versions/API) | 2026-07-15 (through 2.0; 2.1 user-provided) |
 | SuperWoW **Features** wiki — https://github.com/balakethelock/SuperWoW/wiki/Features | ✅ Fetches cleanly | Dependency API surface | 2026-07-15 |
 | Nampower (avitasia fork) `SCRIPTS.md` / `EVENTS.md` — gitea.com/avitasia/nampower | ✅ Search/fetch works | Dependency updates (queue API, events) | 2026-07-15 |
 | SuperCleveRoidMacros wiki — https://github.com/jrc13245/SuperCleveRoidMacros/wiki | ✅ Fetches cleanly | Dependency updates (conditionals, reqs) | 2026-07-15 (repo archived/stable) |
 | Turtle WoW Wiki — https://turtle-wow.fandom.com | ✅ Fetches cleanly | Confirmed custom mechanics | 2026-07-15 |
 | SuperWoW **release page** — /releases/tag/Release | ⚠️ Served STALE content | Do NOT rely on — use the Changelog wiki instead | — |
-| `talents.turtlecraft.gg/<class>` | ❌ Blocks bots (robots-disallowed) | USER browses; paste specifics. (Use `TALENTS_1_18_1.md` in-repo instead.) | — |
+| `talents.turtlecraft.gg/<class>` | ❌ Blocks bots (robots-disallowed) | USER browses; paste specifics. (Use `docs/TALENTS_1_18_1.md` instead.) | — |
 | Tortoise DB **viewer** — https://xian55.github.io/tortoise-db-viewer/ | ❌ JS app, fetch returns empty shell | USER browses for exact spell/item numbers; paste specifics | — |
 | `Penqle/tortoise-wow` (server DB / MaNGOS core) | ⚠️ Technically, but DON'T | Poor fit: it's an emulator with untested classes, NOT live-Turtle authoritative | — |
 
-**Rule:** for talents, read `TALENTS_1_18_1.md` — never try to scrape the calculators. For
+**Rule:** for talents, read `docs/TALENTS_1_18_1.md` — never try to scrape the calculators. For
 exact spell numbers the user must paste from the DB viewer (Claude Code can't read it). Only
 the ✅ rows are safe to fetch during an update check.
 

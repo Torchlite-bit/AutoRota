@@ -14,7 +14,7 @@ old "AutoRota" name internally.
 RULES), then `docs/dependencies.md`, `docs/roadmap.md`, `docs/rotations.md`,
 `docs/turtle-mechanics.md`, `docs/architecture.md`, and `docs/sources.md`. Also skim the
 `.toc` to learn the file load order. (For talents, the source of truth is the in-repo
-`TALENTS_1_18_1.md` — the online talent calculators block automated access, so don't try to
+`docs/TALENTS_1_18_1.md` — the online talent calculators block automated access, so don't try to
 fetch them. `docs/sources.md` lists which links are fetchable vs. paste-only and holds the
 two update commands for keeping the docs current.)
 

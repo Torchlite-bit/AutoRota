@@ -19,7 +19,7 @@ becomes `Aegis_SBR.lua` after Phase 0. Update this doc as part of the rebrand.)
 - **Assets**: `Icons/` (TGA textures — toggles, sliders, buttons, pills, cards, sigil, and
   the new `logo`), `Fonts/` (PT Sans Narrow, OFL-licensed + `OFL.txt`).
 - **Meta**: `.toc`, `README.md`, `CHANGELOG.md`, `docs/`, `scripts/verify.py`,
-  `docs/TALENTS_1.18.1.md` (talent name reference used by the modules).
+  `docs/TALENTS_1_18_1.md` (talent name reference used by the modules).
 
 ## Rotation model
 - Each class module exposes `M:Rotate(cfg)` (and spec sub-rotations). On each press the
