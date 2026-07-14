@@ -12,8 +12,11 @@ old "AutoRota" name internally.
 
 **Read these before doing anything**, in order: `CLAUDE.md` (especially the CRITICAL
 RULES), then `docs/dependencies.md`, `docs/roadmap.md`, `docs/rotations.md`,
-`docs/turtle-mechanics.md`, and `docs/architecture.md`. Also skim the `.toc` to learn the
-file load order.
+`docs/turtle-mechanics.md`, `docs/architecture.md`, and `docs/sources.md`. Also skim the
+`.toc` to learn the file load order. (For talents, the source of truth is the in-repo
+`TALENTS_1_18_1.md` — the online talent calculators block automated access, so don't try to
+fetch them. `docs/sources.md` lists which links are fetchable vs. paste-only and holds the
+two update commands for keeping the docs current.)
 
 **Two rules that override everything else:**
 1. **The #1 priority is the rebrand to `Aegis_SBR` — commands and file names — and it is
