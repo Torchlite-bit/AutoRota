@@ -63,11 +63,110 @@ local function applyClassIcon()
 end
 
 -- ============================================================
+-- shared group-member picker popup, used by the assist-target row below.
+-- Lists raid1-40 while in a raid, else party1-4 plus the player. Only feeds
+-- a NAME into the edit box; the actual assist logic (AutoRota:RunAssist)
+-- re-resolves the unit and matches by GUID every press, so a stale or
+-- same-named pick here can never cause it to track the wrong mob.
+-- ============================================================
+local pickerFrame = nil
+
+local function showGroupPicker(anchorFrame, onPick)
+    if not pickerFrame then
+        local pf = CreateFrame("Frame", "AutoRotaGroupPicker", UIParent)
+        pf:SetWidth(150)
+        pf:SetBackdrop({
+            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true, tileSize = 16, edgeSize = 12,
+            insets = { left = 3, right = 3, top = 3, bottom = 3 },
+        })
+        pf:SetBackdropColor(0.08, 0.08, 0.12, 0.95)
+        pf:SetBackdropBorderColor(0.5, 0.5, 0.7, 0.9)
+        pf:SetFrameStrata("TOOLTIP")
+        pf:EnableMouse(true)
+        pf:Hide()
+        pf.rows = {}
+        for i = 1, 40 do
+            local row = CreateFrame("Button", nil, pf)
+            row:SetPoint("TOPLEFT", pf, "TOPLEFT", 4, -4 - (i - 1) * 16)
+            row:SetWidth(142); row:SetHeight(14)
+            local t = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            t:SetPoint("LEFT", row, "LEFT", 4, 0)
+            row.text = t
+            row:SetScript("OnEnter", function() this.text:SetTextColor(0.4, 1, 0.6); pf.mouseInside = true end)
+            row:SetScript("OnLeave", function() this.text:SetTextColor(1, 1, 1); pf.mouseInside = false end)
+            row:Hide()
+            pf.rows[i] = row
+        end
+        -- Close automatically once the mouse has been outside for 2 seconds.
+        pf:SetScript("OnUpdate", function()
+            if not this:IsVisible() then return end
+            if this.mouseInside then this.closeTimer = nil; return end
+            if not this.closeTimer then this.closeTimer = GetTime() end
+            if GetTime() - this.closeTimer > 2 then this:Hide(); this.closeTimer = nil end
+        end)
+        pf:SetScript("OnEnter", function() this.mouseInside = true end)
+        pf:SetScript("OnLeave", function() this.mouseInside = false end)
+        pickerFrame = pf
+    end
+
+    local pf = pickerFrame
+    if pf:IsShown() and pf.currentAnchor == anchorFrame then
+        pf:Hide()
+        return
+    end
+    pf.currentAnchor = anchorFrame
+    pf.mouseInside = true
+    pf.closeTimer = nil
+
+    local members = {}
+    if GetNumRaidMembers() > 0 then
+        for i = 1, 40 do
+            local n = UnitName("raid" .. i)
+            if n then table.insert(members, n) end
+        end
+    else
+        local pn = UnitName("player")
+        if pn then table.insert(members, pn) end
+        for i = 1, 4 do
+            local n = UnitName("party" .. i)
+            if n then table.insert(members, n) end
+        end
+    end
+
+    if table.getn(members) == 0 then
+        pf:Hide()
+        DEFAULT_CHAT_FRAME:AddMessage("AutoRota: no group members found.", 1, 0.5, 0.3)
+        return
+    end
+
+    pf:ClearAllPoints()
+    pf:SetPoint("TOPLEFT", anchorFrame, "BOTTOMLEFT", 0, 2)
+
+    local count = 0
+    for i = 1, 40 do pf.rows[i]:Hide() end
+    for i, name in ipairs(members) do
+        count = count + 1
+        pf.rows[i].text:SetText(name)
+        pf.rows[i].text:SetTextColor(1, 1, 1)
+        pf.rows[i].memberName = name
+        pf.rows[i]:SetScript("OnClick", function()
+            onPick(this.memberName)
+            pf:Hide()
+        end)
+        pf.rows[i]:Show()
+    end
+    pf:SetHeight(count * 16 + 8)
+    pf:Show()
+end
+
+-- ============================================================
 -- options panel (right-click): addon-wide, non class-specific options
 -- ============================================================
 local function buildPanel()
     local p = CreateFrame("Frame", "AutoRotaMinimapPanel", UIParent)
-    p:SetWidth(232); p:SetHeight(104)
+    p:SetWidth(232); p:SetHeight(214)
     p:SetFrameStrata("DIALOG")
     p:SetBackdrop({
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -85,20 +184,90 @@ local function buildPanel()
     title:SetPoint("TOPLEFT", 12, -10)
     title:SetText("AutoRota options")
 
-    local acq = CreateFrame("CheckButton", "AutoRotaMinimapAcquire", p, "UICheckButtonTemplate")
-    acq:SetWidth(22); acq:SetHeight(22)
-    acq:SetPoint("TOPLEFT", 10, -32)
-    local acqLabel = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    acqLabel:SetPoint("LEFT", acq, "RIGHT", 2, 0)
-    acqLabel:SetText("Auto target (acquire nearest enemy)")
-    acq:SetScript("OnClick", function()
-        if AutoRotaDB then AutoRotaDB.acquire = acq:GetChecked() and true or false end
+    local modeLabel = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    modeLabel:SetPoint("TOPLEFT", 12, -30)
+    modeLabel:SetText("Targeting")
+
+    -- Three mutually exclusive radios. Each one, on click, just writes its
+    -- own mode to AutoRotaDB and re-syncs all three from that single source
+    -- of truth (RefreshPanel), rather than manually unchecking siblings.
+    local function makeRadio(yOff, text, mode)
+        local r = CreateFrame("CheckButton", nil, p, "UIRadioButtonTemplate")
+        r:SetWidth(16); r:SetHeight(16)
+        r:SetPoint("TOPLEFT", 14, yOff)
+        local lbl = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        lbl:SetPoint("LEFT", r, "RIGHT", 4, 0)
+        lbl:SetText(text)
+        r.mode = mode
+        r:SetScript("OnClick", function()
+            if AutoRotaDB then AutoRotaDB.targetMode = this.mode end
+            AM:RefreshPanel()
+        end)
+        return r
+    end
+
+    p.autoRadio   = makeRadio(-48, "Auto (nearest enemy)", "auto")
+    p.manualRadio = makeRadio(-66, "Manual (defer to me / assist addon)", "manual")
+    p.assistRadio = makeRadio(-84, "Assist:", "assist")
+
+    -- Assist target: a name (typed or picked), matched to a live group unit
+    -- and then to that unit's target by GUID every press - see RunAssist.
+    local edit = CreateFrame("EditBox", "AutoRotaAssistEdit", p, "InputBoxTemplate")
+    edit:SetWidth(112); edit:SetHeight(18)
+    edit:SetAutoFocus(false)
+    edit:SetPoint("LEFT", p.assistRadio, "RIGHT", 44, 0)
+    edit:SetScript("OnEnterPressed", function()
+        local txt = edit:GetText()
+        if AutoRotaDB then
+            AutoRotaDB.assistTarget = txt
+            if txt ~= "" then AutoRotaDB.targetMode = "assist" end
+        end
+        AM:RefreshPanel()
+        edit:ClearFocus()
     end)
-    p.acq = acq
+    edit:SetScript("OnEscapePressed", function() edit:ClearFocus() end)
+    p.assistEdit = edit
+
+    local pickBtn = CreateFrame("Button", nil, p)
+    pickBtn:SetWidth(18); pickBtn:SetHeight(18)
+    pickBtn:SetPoint("LEFT", edit, "RIGHT", 4, 0)
+    pickBtn:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 8,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    pickBtn:SetBackdropColor(0.15, 0.15, 0.25, 0.9)
+    pickBtn:SetBackdropBorderColor(0.4, 0.4, 0.6, 0.7)
+    local pickText = pickBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    pickText:SetPoint("CENTER", pickBtn, "CENTER", 0, 0)
+    pickText:SetText("|cff88ccffP|r")
+    pickBtn:SetScript("OnEnter", function()
+        this:SetBackdropBorderColor(0.6, 0.6, 0.8, 1)
+        GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Pick a group member")
+        GameTooltip:Show()
+    end)
+    pickBtn:SetScript("OnLeave", function()
+        this:SetBackdropBorderColor(0.4, 0.4, 0.6, 0.7)
+        GameTooltip:Hide()
+    end)
+    pickBtn:SetScript("OnClick", function()
+        showGroupPicker(pickBtn, function(name)
+            p.assistEdit:SetText(name)
+            if AutoRotaDB then
+                AutoRotaDB.assistTarget = name
+                AutoRotaDB.targetMode = "assist"
+            end
+            AM:RefreshPanel()
+        end)
+    end)
 
     local hint = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    hint:SetPoint("TOPLEFT", 12, -58)
-    hint:SetText("Off lets a separate assist addon set the target.")
+    hint:SetPoint("TOPLEFT", 12, -108)
+    hint:SetWidth(208)
+    hint:SetJustifyH("LEFT")
+    hint:SetText("Assist mirrors that player's target by GUID, not by name - a same-named mob from another group is never mistaken for theirs.")
 
     local cfg = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
     cfg:SetWidth(208); cfg:SetHeight(22)
@@ -112,10 +281,21 @@ local function buildPanel()
     AM.panel = p
 end
 
+-- Re-sync all three radios and the assist edit box from AutoRotaDB.
+function AM:RefreshPanel()
+    local p = self.panel
+    if not p then return end
+    local mode = AutoRota and AutoRota:TargetMode() or "auto"
+    p.autoRadio:SetChecked(mode == "auto")
+    p.manualRadio:SetChecked(mode == "manual")
+    p.assistRadio:SetChecked(mode == "assist")
+    p.assistEdit:SetText((AutoRotaDB and AutoRotaDB.assistTarget) or "")
+end
+
 function AM:TogglePanel()
     if not self.panel then return end
     if self.panel:IsShown() then self.panel:Hide(); return end
-    self.panel.acq:SetChecked(not (AutoRotaDB and AutoRotaDB.acquire == false))
+    self:RefreshPanel()
     self.panel:ClearAllPoints()
     self.panel:SetPoint("TOPRIGHT", self.button, "BOTTOMLEFT", 4, 0)
     self.panel:Show()

@@ -4,6 +4,30 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.13.14b — Warlock: Dark Harvest overhaul, cast-confirmed DoT tracking, and a three-way targeting mode
+
+**Feature + fix.** A deep pass over the Warlock's Dark Harvest handling and DoT recast reliability, plus a new global targeting mode with GUID-based assist. Cross-checked against SuperCleveRoidMacros' and Cursive's own Dark Harvest / duration tables during development, so the base durations and the 30%-tick-boost math are no longer guesses.
+
+- **Dark Harvest restored as a filler, DoT-aware.** Dark Harvest channels the instant it is off cooldown and wand-fills (falling back to *Shadow Bolt* with no wand equipped) between channels instead of leaving the rotation idle. Before committing to a channel it checks every enabled DoT's estimated remaining time and tops up anything that would fall off mid-channel — the channel's own length is Rapid-Deterioration-scaled (confirmed in-game: 8s base → 7.52s at rank 2, the same 6% cut the talent applies to Corruption / Curse of Agony / Siphon Life), and the required buffer accounts for Dark Harvest's own 30% tick-rate boost eating the DoT's remaining life faster than real time. The 30%-boost math (tick-boundary alignment, one active-channel window) is a direct port of Cursive's verified `curses:TrackDarkHarvest` / `GetLastTickTime` / `GetDarkHarvestReduction`, adapted for the fact AutoRota only ever evaluates it once a channel has already ended.
+- **Cast-confirmed DoT tracking.** DoT recasts are now confirmed via SuperWoW's `UNIT_CASTEVENT` (`CAST` vs `FAIL`) instead of being stamped as successful the instant they are sent. A cast that silently fails (most commonly the GCD still being active while the wand fires) used to blank out the recast window for the full throttle interval doing nothing; it now retries on the very next press. `DotRemaining()` (used only to gate the Dark Harvest start) rides the same confirmed timestamp.
+- **Wand stops itself ahead of a DoT expiring**, instead of reactively trying to interrupt a shot that may already be mid-flight the instant the DoT falls off — a tracked DoT within 1.5s of expiring pauses (or does not start) the wand, trading a small bounded gap for eliminating the recast-vs-shot race.
+- **Rapid Deterioration talent support.** The Turtle-specific Affliction talent (2 ranks, 3% shorter Corruption / Curse of Agony / Siphon Life duration per rank, more damage per tick) is read from the talent tree and scales every duration estimate — including Dark Harvest's own channel length — by the rank actually taken, not just its presence.
+- **Malediction secondary curse restored.** With that talent, Curse of Agony rides alongside your main curse (skipped when the main curse already is Agony or Doom) and is now tracked and refreshed on its own again.
+- **Soul shard farming restored**, folded into the Drain Soul execute finisher rather than duplicating it: with *Stop early to keep shards* on, Drain Soul stops finishing targets once your shard count reaches the target, instead of draining every kill regardless of how many shards you're already holding.
+- **Low-mana wand fallback.** Below a configurable mana floor (default 15%), the rotation prefers Life Tap if it's safe to use, otherwise drops to the wand — previously a DoT that needed recasting but couldn't be afforded would still be queued, fail in-game, and stall the rotation for nothing.
+- **Nightfall moved to the top priority.** The free instant Shadow Bolt on a Shadow Trance proc is now checked before Drain Life / Health Funnel / Shadowburn / Drain Soul, since a longer-running channel started first could burn through the whole proc window before the rotation got back around to it.
+- **Fix — Shadowburn no longer stalls at zero shards.** It now checks your actual Soul Shard count before casting; previously, at 0 shards near the execute threshold, the cast failed in-game every press while the addon believed it had succeeded, stalling instead of falling through to Drain Soul or the filler.
+
+**New global targeting mode: Assist.**
+- The minimap right-click panel's single "auto target" checkbox is now three mutually exclusive radios: **Auto** (acquire the nearest enemy when you have none, unchanged default), **Manual** (defer entirely to you or a separate assist addon), and **Assist** (continuously mirror a chosen party/raid member's target). A "P" picker button next to the Assist name field lists your current group/raid live.
+- Assist matches **only by GUID**, re-resolved every press via SuperWoW's `UnitExists`/`TargetUnit` — never by name. A prior addon's name-only matching couldn't tell two different mobs with the same name apart (e.g. one already tapped by a different nearby group), which in practice meant silently attacking the wrong group's mob without ever noticing; GUID matching makes that class of bug structurally impossible.
+- `AutoRotaDB.acquire` (boolean) is migrated transparently to the new `AutoRotaDB.targetMode` the first time it's read after upgrading — no action needed on existing installs.
+- `/ar acquire on|off|assist <name>` covers the new mode from the command line as well as the panel.
+
+All Lua files pass the balance check; the define-before-use ordering audit is clean.
+
+---
+
 ## v0.13.13b — Paladin: strike-toggle rework, heal-mode mana + split weaves, and a tab-switch fix
 
 **Feature + fix.** A pass over the Paladin's Damage/Tank strikes and Healer mode, plus a shared-shell fix that made the Damage tab unreachable once Healer was selected. Confirmed in-game on the 1.18.1 client.

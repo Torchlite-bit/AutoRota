@@ -553,30 +553,105 @@ end
 -- ============================================================
 -- Rotation entry point
 -- ============================================================
--- Whether AutoRota acquires its own target. Default on. Off defers targeting to
--- a separate assist addon, so this character only acts on the target that addon
--- sets and never pulls a stray enemy on its own.
-function AutoRota:SelfTargetEnabled()
-    if AutoRotaDB and AutoRotaDB.acquire == false then return false end
-    return true
+-- Targeting mode: three-way, mutually exclusive.
+--   "auto"   - acquire the nearest enemy when you have none (the old default).
+--   "manual" - never touch targeting; defer to you or a separate assist addon.
+--   "assist" - continuously mirror AutoRotaDB.assistTarget's current target.
+-- Migrated transparently from the older acquire boolean (true/nil -> "auto",
+-- false -> "manual") the first time this is read after upgrading.
+-- ============================================================
+function AutoRota:TargetMode()
+    if type(AutoRotaDB) ~= "table" then return "auto" end
+    local m = AutoRotaDB.targetMode
+    if m == "auto" or m == "manual" or m == "assist" then return m end
+    local migrated = (AutoRotaDB.acquire == false) and "manual" or "auto"
+    AutoRotaDB.targetMode = migrated
+    return migrated
 end
 
--- /ar acquire on|off - toggle self-targeting (also on the minimap right-click).
-function AutoRota:CmdAcquire(arg)
+-- /ar acquire on|off|assist <name> - set targeting mode (also on the minimap
+-- right-click). "on"/"auto" and "off"/"manual"/"defer" keep their old
+-- meaning; "assist <name>" is new and requires a party/raid member's name.
+function AutoRota:CmdAcquire(arg, arg2)
     local low = string.lower(arg or "")
     if low == "" then
-        local on = self:SelfTargetEnabled()
-        msgOut("self targeting is " .. (on and "on (acquires nearest enemy)" or "off (defers to your assist addon)") .. ". Use /ar acquire on or off.")
+        local mode = self:TargetMode()
+        local desc = mode == "auto" and "auto (acquires nearest enemy)"
+            or mode == "assist" and ("assist (mirrors " .. ((AutoRotaDB and AutoRotaDB.assistTarget) or "?") .. ")")
+            or "manual (defers to you or an assist addon)"
+        msgOut("targeting mode is " .. desc .. ". Use /ar acquire on, off, or assist <name>.")
         return
     end
-    if low == "on" or low == "self" then
-        if AutoRotaDB then AutoRotaDB.acquire = true end
-        msgOut("self targeting on. AutoRota acquires the nearest enemy when it has no target.")
-    elseif low == "off" or low == "assist" or low == "defer" then
-        if AutoRotaDB then AutoRotaDB.acquire = false end
-        msgOut("self targeting off. AutoRota leaves targeting to your assist addon and only acts on the set target.")
+    if low == "on" or low == "self" or low == "auto" then
+        if AutoRotaDB then AutoRotaDB.targetMode = "auto" end
+        msgOut("targeting mode: auto. AutoRota acquires the nearest enemy when it has no target.")
+    elseif low == "off" or low == "manual" or low == "defer" then
+        if AutoRotaDB then AutoRotaDB.targetMode = "manual" end
+        msgOut("targeting mode: manual. AutoRota leaves targeting to you or your assist addon.")
+    elseif low == "assist" then
+        if not arg2 or arg2 == "" then
+            msgOut("usage: /ar acquire assist <party/raid member name>.", 1, 0.5, 0.3)
+            return
+        end
+        if AutoRotaDB then
+            AutoRotaDB.targetMode = "assist"
+            AutoRotaDB.assistTarget = arg2
+        end
+        msgOut("targeting mode: assist. Mirroring " .. arg2 .. "'s target.")
     else
-        msgOut("usage: /ar acquire on or /ar acquire off.", 1, 0.5, 0.3)
+        msgOut("usage: /ar acquire on or /ar acquire off or /ar acquire assist <name>.", 1, 0.5, 0.3)
+    end
+end
+
+-- Resolve a party/raid member's unit id by exact (case-insensitive) name.
+-- Raid members are only enumerable while actually in a raid; a solo party
+-- falls back to partyN + the player.
+function AutoRota:FindGroupUnitByName(name)
+    if not name or name == "" then return nil end
+    local want = string.lower(name)
+    if GetNumRaidMembers() > 0 then
+        for i = 1, 40 do
+            local n = UnitName("raid" .. i)
+            if n and string.lower(n) == want then return "raid" .. i end
+        end
+        return nil
+    end
+    local pn = UnitName("player")
+    if pn and string.lower(pn) == want then return "player" end
+    for i = 1, 4 do
+        local n = UnitName("party" .. i)
+        if n and string.lower(n) == want then return "party" .. i end
+    end
+    return nil
+end
+
+-- Continuously mirror AutoRotaDB.assistTarget's current target, matched by
+-- GUID only. Name-only matching cannot tell two different mobs with the same
+-- name apart (e.g. one tapped by a different nearby group), which in
+-- practice meant silently attacking the wrong group's mob without ever
+-- noticing - SuperWoW's GUID-aware UnitExists/TargetUnit avoids that
+-- entirely by re-resolving the assist target's live target every call.
+function AutoRota:RunAssist()
+    local name = AutoRotaDB and AutoRotaDB.assistTarget
+    if not name or name == "" then return end
+    local unit = self:FindGroupUnitByName(name)
+    if not unit then
+        self:Throttle("assist target '" .. name .. "' is not in your group.")
+        return
+    end
+    local _, theirGUID = UnitExists(unit .. "target")
+    if not theirGUID then
+        -- They have no target: drop any stale target of our own rather than
+        -- keep fighting whatever we had selected before they cleared theirs.
+        if UnitExists("target") then ClearTarget() end
+        return
+    end
+    if UnitIsDead(unit .. "target") or not UnitCanAttack("player", unit .. "target") then
+        return
+    end
+    local _, myGUID = UnitExists("target")
+    if myGUID ~= theirGUID then
+        TargetUnit(theirGUID)
     end
 end
 
@@ -604,13 +679,19 @@ function AutoRota:RunRotation()
     -- target and must not be forced to grab one.
     local supportRun = self.active.RunsWithoutTarget and self.active:RunsWithoutTarget(cfg)
 
-    -- Auto-acquire the nearest enemy when you have none, behind TWO independent
-    -- gates: the user's global toggle (/ar acquire or the minimap option) and a
-    -- per-module opt-out (autoAcquireTarget == false, e.g. the Hunter, so a ranged
-    -- class never grabs and pulls a random mob). With acquisition off we defer to
-    -- an assist addon and drop any corpse so it can reassign us.
-    if not UnitExists("target") or UnitIsDead("target") then
-        if self:SelfTargetEnabled() and self.active.autoAcquireTarget ~= false and not supportRun then
+    -- Targeting: three mutually exclusive modes (see TargetMode). "assist"
+    -- actively mirrors a chosen group/raid member's target every press, even
+    -- while you already have some target selected, so it runs unconditionally
+    -- here rather than only when you have none. "auto" only ever grabs when
+    -- you have nothing, behind the same per-module opt-out as before
+    -- (autoAcquireTarget == false, e.g. the Hunter, so a ranged class never
+    -- grabs and pulls a random mob). "manual" defers entirely, only dropping
+    -- a corpse so a separate assist addon can reassign you.
+    local mode = self:TargetMode()
+    if mode == "assist" and not supportRun then
+        self:RunAssist()
+    elseif not UnitExists("target") or UnitIsDead("target") then
+        if mode == "auto" and self.active.autoAcquireTarget ~= false and not supportRun then
             TargetNearestEnemy()
         elseif UnitExists("target") and UnitIsDead("target") then
             ClearTarget()
@@ -658,7 +739,7 @@ function AutoRota:EvalCommand(msg)
     if cmd == "del" or cmd == "delete" then self:CmdDel(t[2]); return end
     if cmd == "check" then self:CmdCheck(); return end
     if cmd == "reset" then self:CmdReset(); return end
-    if cmd == "acquire" then self:CmdAcquire(t[2]); return end
+    if cmd == "acquire" then self:CmdAcquire(t[2], t[3]); return end
     if cmd == "minimap" then
         if AutoRotaMinimap and AutoRotaMinimap.ToggleShown then
             local hidden = AutoRotaMinimap:ToggleShown()
