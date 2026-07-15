@@ -72,6 +72,19 @@ local STING_DUR = {
     ["Scorpid Sting"] = 20,
     ["Viper Sting"]   = 8,
 }
+-- Debuff icon fragments (classic 1.12 icons) for the stings and Hunter's Mark,
+-- fed to the core's ScanTargetDebuff as its fallback when SuperWoW's id->name
+-- resolution is unavailable or misses an id. Without a fragment those checks
+-- always read "not up" on such clients, so the sting was blind-recast every
+-- throttle interval (and an Undead target was wrongly learned as immune after
+-- 2.5s, since the applied sting could never be seen). Exact-name matching
+-- still wins whenever SuperWoW resolves the debuff.
+local STING_TEX = {
+    ["Serpent Sting"] = "Ability_Hunter_Quickshot",
+    ["Scorpid Sting"] = "Ability_Hunter_CriticalShot",
+    ["Viper Sting"]   = "Ability_Hunter_AimedShot",
+    ["Hunter's Mark"] = "Ability_Hunter_SniperShot",
+}
 
 M.modeAlias = {
     ranged = "ranged", range = "ranged", ["r"] = "ranged",
@@ -331,7 +344,7 @@ end
 M.debuffThrottle = {}
 function M:MaintainDebuff(name, interval)
     if not self:KnowsSpell(name) then return false end
-    if self:TargetDebuffUp(name, nil) then return false end
+    if self:TargetDebuffUp(name, STING_TEX[name]) then return false end
     local id = self:TargetId()
     local rec = self.debuffThrottle[name]
     local now = GetTime()
@@ -350,7 +363,7 @@ end
 -- up, which silently burns the reapply throttle and the sting never fires.
 function M:MaintainSting(name, interval)
     if not self:KnowsSpell(name) then return false end
-    if self:TargetDebuffUp(name, nil) then return false end
+    if self:TargetDebuffUp(name, STING_TEX[name]) then return false end
     local id = self:TargetId()
     local rec = self.debuffThrottle[name]
     local now = GetTime()
@@ -394,7 +407,7 @@ function M:StingBlocked(sting)
     if self:StingImmuneNow() then return true end
     local _, guid = UnitExists("target")
     if guid and self.stingTry and self.stingTry.guid == guid and self.stingTry.name == sting then
-        if self:TargetDebuffUp(sting, nil) then
+        if self:TargetDebuffUp(sting, STING_TEX[sting]) then
             self.stingTry = nil                  -- it landed; stop watching
         elseif (GetTime() - self.stingTry.t) > 2.5 then
             -- Cast but never seen on the target. Only treat that as immunity on a
@@ -531,7 +544,7 @@ function M:Rotate(cfg)
     -- Strict opener gate: Serpent Sting may only follow a confirmed Hunter's Mark.
     -- (True when Mark is disabled or unlearned, so it never blocks at low level.)
     local markOK = (not cfg.useHuntersMark) or (not self:KnowsSpell("Hunter's Mark"))
-        or self:TargetDebuffUp("Hunter's Mark", nil)
+        or self:TargetDebuffUp("Hunter's Mark", STING_TEX["Hunter's Mark"])
     -- Effective range state. "auto" picks ranged vs melee by distance each press
     -- (so abilities only fire in the matching state); otherwise honor the choice.
     local melee
@@ -549,9 +562,9 @@ function M:Rotate(cfg)
             .. " sting=" .. (cfg.sting ~= "" and (cfg.sting
                 .. (self:KnowsSpell(cfg.sting) and "" or "(unlearned)")
                 .. (self:StingImmuneNow() and "(immune)" or "")
-                .. (self:TargetDebuffUp(cfg.sting, nil) and "(up)" or "")) or "-")
+                .. (self:TargetDebuffUp(cfg.sting, STING_TEX[cfg.sting]) and "(up)" or "")) or "-")
             .. " inMelee=" .. (inMeleeNow and "Y" or "n")
-            .. " mark=" .. (cfg.useHuntersMark and (self:TargetDebuffUp("Hunter's Mark", nil) and "Y" or "n") or "-")
+            .. " mark=" .. (cfg.useHuntersMark and (self:TargetDebuffUp("Hunter's Mark", STING_TEX["Hunter's Mark"]) and "Y" or "n") or "-")
             .. " L&L=" .. (self:HasBuff("Lock and Load") and "Y" or "n")
             .. " auto=" .. (self:AutoShotting() and "Y" or (self.autoShotOn and "assumed" or "N"))
             .. " steady=" .. (cfg.useSteadyShot and (self:SteadyReady() and "ready" or "wait") .. "/" .. self:WeaveSource() or "-")
