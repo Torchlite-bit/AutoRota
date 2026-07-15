@@ -34,9 +34,12 @@ migration, `/sbr` + `/ar`, zero load errors). The addon is **Aegis_SBR** through
 core global `Aegis_SBR`, UI `Aegis_SBR_UI`, layout `Aegis_SBR_Layout`, minimap
 `Aegis_SBR_Minimap`, frames `Aegis_SBR_*`/`AegisUI_*`, saved variable `AegisDB` (old
 `AutoRotaDB` still toc-listed as a rollback backup — drop it + clear on PLAYER_LOGOUT a
-few versions from now). **The next task is the Phase 1 rotation-correctness
-audit-and-report** (see `docs/roadmap.md`) — a written discrepancy report per class,
-NO rotation edits without sign-off (Critical Rule #1).
+few versions from now). **The Phase 1 audit-and-report is DELIVERED (v0.14.1)**: see
+`docs/audit-phase1-rotations.md` — a per-class discrepancy report (all 9 classes) with
+source/confidence/action/risk per finding, plus the roadmap-pre-authorized Hunter
+sting-detection fix (the only code change; no priorities touched). **Next: the user
+signs off findings per class; approved items are then implemented as their own gated,
+verified batches** (Critical Rule #1 still applies to every one of them).
 
 **Logos:** the user will provide raw logo image files LATER. They need converting to TGA
 (power-of-two dimensions, 32-bit, GIMP/uncompressed export — see `docs/roadmap.md` Phase 0

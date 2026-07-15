@@ -114,7 +114,9 @@ Ranged BM/MM standard; Survival melee viable with pet tanking.
 ### PvP/defensive (Phase 4, note only)
 Aspect of the Turtle, Survival of the Fittest, Exhilaration, Feign Death, Deterrence.
 
-### Known bug (Phase 1): Serpent Sting icon fallback.
+### Known bug (Phase 1): Serpent Sting icon fallback — FIXED in v0.14.1
+(sting/Mark checks now pass the classic icon fragments as the scan fallback; see
+CHANGELOG v0.14.1 and audit item H1).
 
 ---
 

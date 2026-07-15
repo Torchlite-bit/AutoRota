@@ -4,6 +4,27 @@ All notable changes to **Aegis: Single Button Rotation** (formerly **AutoRota**)
 
 ---
 
+## v0.14.1 — Phase 1 rotation audit report + Hunter sting-detection fix
+
+**Audit + one pre-authorized fix.** The Phase 1 rotation-correctness audit is complete:
+`docs/audit-phase1-rotations.md` holds a per-class discrepancy report (all 9 classes; what
+the code does vs. `docs/rotations.md`, with source, confidence tag, recommended action, and
+risk). **No rotation priorities were changed** — every finding waits for per-class
+sign-off, per the project's audit-and-report rule. The one code change is the known Hunter
+bug the roadmap pre-authorized as a non-priority fix:
+
+- **Hunter — sting/Mark detection icon fallback.** Every Serpent/Scorpid/Viper Sting and
+  Hunter's Mark check passed no icon fragment to the debuff scanner, so on a client where
+  SuperWoW's id→name resolution is unavailable (or misses an id) the debuff always read
+  "not up": the sting was blind-recast every throttle interval, and an Undead target was
+  wrongly learned as sting-immune after 2.5s. The classic 1.12 icons are now supplied as
+  the scan fallback (Serpent=`Ability_Hunter_Quickshot`, Scorpid=`Ability_Hunter_CriticalShot`,
+  Viper=`Ability_Hunter_AimedShot`, Mark=`Ability_Hunter_SniperShot`); exact-name matching
+  still wins whenever SuperWoW resolves the id. Which ability fires, and in what order, is
+  unchanged. (Lacerate keeps name-only detection — its custom Turtle icon is unconfirmed.)
+
+---
+
 ## v0.14.0 — Rebrand: AutoRota → Aegis: Single Button Rotation (Aegis_SBR)
 
 **Rebrand (roadmap Phase 0).** The addon is now **Aegis: Single Button Rotation** — folder, files, commands, and saved variables. Rotations, priority lists, and panels are deliberately untouched; this release only renames and migrates.

@@ -102,6 +102,12 @@ Then cut `0.14.0`.
 
 ## Phase 1 — Rotation correctness AUDIT-AND-REPORT  (highest gameplay value)
 
+> **STATUS: report DELIVERED in v0.14.1** — `docs/audit-phase1-rotations.md` covers all 9
+> classes (discrepancy tables + match notes + a cross-class sign-off summary). The Serpent
+> Sting icon-fallback fix below shipped with it (the one pre-authorized code change; no
+> priorities touched). **Open: the user's per-class decisions**, then approved changes land
+> as gated, verified batches with dummy-test verification per the benchmark below.
+
 > ⛔ **This phase does NOT change rotation code on its own initiative.** Per CLAUDE.md
 > Critical Rule #1: the existing priority lists are hand-tuned. This phase VALIDATES them
 > against `docs/rotations.md` and PRODUCES A DISCREPANCY REPORT for the user to act on.
