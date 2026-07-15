@@ -1185,6 +1185,23 @@ function Aegis_SBR_UI:Build()
     chip:SetPoint("LEFT", brand, "RIGHT", 10, 0)
     chipFS:SetPoint("CENTER", chip, "CENTER", 0, 0)
 
+    -- Aegis logo (Phase 0 stub): the raw art arrives later as
+    -- Interface\AddOns\Aegis_SBR\logo.tga (power-of-two, 32-bit). The 1.12
+    -- client's SetTexture returns nil for a missing file, so until the file
+    -- exists the row keeps the sigil + wordmark fallback and no stray solid
+    -- quad is ever drawn. New textures need a full relog, not just /reload.
+    local logo = f:CreateTexture(nil, "ARTWORK")
+    local logoOK = logo:SetTexture("Interface\\AddOns\\Aegis_SBR\\logo")
+    if logoOK then
+        logo:SetWidth(96); logo:SetHeight(24)
+        logo:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -8)
+        sigil:Hide(); sigilFS:Hide(); brand:Hide()
+        chip:ClearAllPoints()
+        chip:SetPoint("LEFT", logo, "RIGHT", 10, 0)
+    else
+        logo:Hide()
+    end
+
     local hl1 = f:CreateTexture(nil, "ARTWORK")
     hl1:SetTexture(PAL.line[1], PAL.line[2], PAL.line[3], 1); hl1:SetHeight(1)
     hl1:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -40)
