@@ -309,4 +309,136 @@ back to home stance. Stance requirements are vanilla-1.12-conservative by design
 
 ---
 
-*(Sections 7-9 appended as each class is audited.)*
+## 7. ROGUE (`classes/Class_Rogue.lua`)
+
+### What the code does
+
+Off-GCD: Adrenaline Rush + Blade Flurry by pop-mode (always/elite/off). GCD priority:
+Riposte inside its parry window → build at 0 CP (auto-builder prefers *Noxious Assault* if
+known, else Sinister Strike) → Slice and Dice refresh when <5s left (**at exactly 1 CP** it
+casts SnD; at 2+ CP it Eviscerates first, then re-applies SnD at the next 1 CP — the
+ExAutoRogue cheap-refresh model) → Envenom kept up the same way (self-buff model with its
+own duration table) → Rupture at the finisher threshold when missing → Eviscerate at
+`cpFinish` → build. SnD durations assume the +45% duration talent.
+
+### Discrepancies
+
+| # | Ability / order | What the code does | What research says | Source + confidence | Recommended action | RISK if changed |
+|---|---|---|---|---|---|---|
+| R1 | **Surprise Attack missing** | No Surprise Attack; the only reactive is Riposte (parry window) | "**Surprise Attack** (Combat 5th-row capstone): 120% weapon, 10 energy, usable **after target dodges**, can't be dodged/parried/blocked" | rotations.md + turtle-mechanics.md `[T]` | **Headline gap, report**: add a dodge-window reactive exactly like Riposte's parry tracker (the combat-log plumbing already exists; the hunter's Mongoose tracker is the same pattern) | Reactive-window ability = on-bar requirement caveat (SCRM lesson); needs the exact proc rule verified live |
+| R2 | **SnD refresh model (1-CP cheap refresh)** | SnD down at 2+ CP → Eviscerate first, SnD re-applied later at 1 CP (brief SnD downtime each cycle) | "**Slice and Dice uptime = top priority**" | rotations.md Combat `[T]` | **Dummy-verify**: the 1-CP-refresh model is a deliberate, proven vanilla technique (hand-tuned heritage); measure SnD uptime with a cast log before proposing refresh-at-current-CP | Changing to refresh-at-any-CP raises uptime but burns big-CP finishers on SnD — could be a net loss; measure first |
+| R3 | **Noxious Assault auto-preferred** | Auto-builder picks *Noxious Assault* over Sinister Strike whenever known | Not documented anywhere in the research docs | code ahead of research `[?]` | **Verify + document**: confirm what Noxious Assault is on Turtle (rank damage/energy vs SS) and record it in rotations.md; auto-prefer may be wrong for Combat | If NA is worse per energy for Combat builds, the auto-pick quietly lowers DPS — a config override exists (fixed builder) as the escape hatch |
+| R4 | **Envenom modeled as a self-buff** | Kept up like SnD with a 12-28s duration table | Not in the research docs (vanilla has no Envenom; Turtle custom) | code ahead of research `[?]` | **Verify + document** Envenom's actual Turtle behavior (buff? finisher damage? poison interaction) | — (toggle is off by default outside the assassination template) |
+| R5 | **No stealth opener** | Rotation starts at the builder; no Ambush/Garrote/Cheap Shot handling | Leveling: "Dagger: **Ambush** → Gouge → pool → Backstab"; Subtlety notes Ambush/Backstab | rotations.md Leveling/Subtlety `[T]` | **Gap, report**: optional stealth-opener step (the druid's Prowl opener is the in-repo pattern to copy) | Low — opener only fires from stealth; but Energy pooling rules differ, needs play-testing |
+| R6 | **Riposte template default** | `assassination` template enables Riposte; `combat` doesn't (Riposte is a Combat-tree talent in vanilla) | — | template oddity | **User decision**: flip Riposte on in the combat template (KnowsSpell-gated anyway) | None |
+
+### Match notes (checked, no discrepancy)
+
+- Blade Flurry + Adrenaline Rush automated on elite/boss (or always) matches the `[T]`
+  burst note; combo-point persistence on target switch needs no code (client-side).
+- Rupture before Eviscerate at the threshold when missing ✓ ("Rupture / Eviscerate
+  finishers"); `combat` template finishes at 5 CP ✓.
+- All casts are bare max-rank `CastSpellByName` (uniform energy costs) — `/sbr trace`
+  surfaces ranks to make that verifiable, per the 0.13.15b note. ✓
+
+---
+
+## 8. PRIEST (`classes/Class_Priest.lua`)
+
+### What the code does
+
+Channel guard (Mind Flay/Mana Burn) → Inner Fire upkeep (any mode). **Heal mode**
+(`DoHeal`): Prayer of Healing at ≥3 hurt, fronted by off-GCD Inner Focus on the prior press
+→ Flash Heal reserved for ≤40% emergencies → Greater Heal for ≥1000 deficits → downranked
+Heal (→ Flash → Lesser fallbacks) → Renew upkeep → PW:Shield (Weakened-Soul-guarded); then
+Lightwell out of combat and an optional Smite/Holy Fire offensive weave. **DPS mode**:
+Shadowform upkeep (toggle) → PW:Shield mitigation (melee/HP<50) → Spirit-Tap execute burst
+<25% (Mind Blast → Smite) → **Mind Blast on CD** → SW:Pain upkeep → Devouring Plague →
+Holy Fire (out of Shadowform) → Mind Flay filler (mana-floor-gated) → chosen filler → wand
+regen loop (5-second rule; wandless fallback keeps casting).
+
+### Discrepancies
+
+| # | Ability / order | What the code does | What research says | Source + confidence | Recommended action | RISK if changed |
+|---|---|---|---|---|---|---|
+| PR1 | **Shadow: Mind Blast before SW:Pain** | MB on CD sits above the DoT upkeep | "Maintain **Shadow Word: Pain** → Mind Blast on CD → Mind Flay" — SW:P listed first | rotations.md Shadow `[T]` | **Report**: one-position swap candidate; SW:P is one GCD per ~24s so the impact is small but the Shadow Weaving opener case (MB triggers weaving) actually argues for the CODE's order. Dummy-verify | Swapping delays MB's cooldown clock on every DoT refresh; genuinely ambiguous — needs a cast log, not opinion |
+| PR2 | **Improved Mind Blast weave (2× Flay → MB)** | MB whenever ready; the channel guard means in practice: full Flay channel → MB if ready — approximately the pattern | "5/5 Improved Mind Blast → pattern is 2× Mind Flay then Mind Blast" | rotations.md Shadow `[T]` | **Verify with a cast log**: current emergent pattern may already match; only add explicit pacing if the log shows MB clipping Flay ticks | Explicit pacing logic is complexity the emergent behavior may already deliver |
+| PR3 | **Holy: Renew placement** | Renew/PW:S are the LAST heal-mode tier (after direct heals) | "**Renew maintenance** (Swift Recovery: +healing on Renew'd targets) → Flash/Greater/PoH" — Renew-first, and Turtle's Swift Recovery makes Renew'd targets heal for more | rotations.md Holy `[T]` | **Discuss**: with Swift Recovery talented, pre-Renewing the triage target before the big heal is a real Turtle synergy. Gated + Phase-3-adjacent tuning | Renew-first burns a GCD before the direct heal on a crashing target — must stay below the emergency Flash tier |
+| PR4 | **Proclaim Champion missing** | Not in the module | Holy capstone: "**keep on the tank** (DR, resist, mana return, hourly battle-res)" | rotations.md Holy `[T]` | **Gap, report**: tank-buff upkeep needs a tank-identification config (new concept for the engine) — design discussion, then gated build | Mis-targeted Champion is wasted on a non-tank; needs explicit target config, not heuristics |
+| PR5 | **Disc support (Power Infusion / rework)** | Disc plays as "heal mode + offensive weave"; no Power Infusion | "Discipline reworked into holy-damage support DPS: tuned Smite + Holy Fire… **Power Infusion**" | rotations.md + turtle-mechanics.md Disc `[T]` | **Report**: the weave covers the Smite/Holy Fire core; PI needs a target config like PR4. Fold both into one "support-target" design decision | Same as PR4 |
+| PR6 | **Vampiric Embrace absent** | Never cast | "Skip Vampiric Embrace on 16-debuff bosses" — absence IS the recommendation | rotations.md Shadow `[T]` | **No change** (deliberately listed here so nobody "adds the missing spell" later) | Adding it would eat a raid debuff slot — don't |
+
+### Match notes (checked, no discrepancy)
+
+- Wand-centric mana economy (floor-gated filler → wand regen → wandless fallback) is
+  exactly research's "mana economy is the weakness" + leveling "wand to death" `[T]`.
+- Flash Heal reserved for emergencies, Greater for big deficits, Heal as the efficient
+  fill, PoH + Inner Focus pairing — all match the Holy/leveling lines ✓.
+- PW:Shield castable in Shadowform on Turtle: code never stance-blocks the shield ✓
+  (mitigation path works in Shadowform).
+- Holy Fire correctly gated out of Shadowform; Devouring Plague upkeep for the Undead
+  racial ✓; Spirit Tap kill-securing burst is a leveling-correct addition research
+  doesn't contradict.
+
+---
+
+## 9. WARLOCK (`classes/Class_Warlock.lua`)
+
+### What the code does
+
+Pet send (melee-gated option) → channel guards (Drain Life/Soul + a race-protected Dark
+Harvest window) → **P0 Nightfall reaction**: rising-edge-only instant Shadow Bolt the
+moment Shadow Trance procs (once per proc, re-armed when the icon clears) → Drain Life
+self-heal below 35% HP → Health Funnel (pet low, self healthy) → Shadowburn execute <20%
+(shard-in-bag-gated) → Drain Soul <20% (with shard-target banking cap) → low-mana valve
+(Life Tap if healthy, else wand) → **ordered DoT upkeep: Immolate → chosen curse →
+(Malediction CoA secondary) → Corruption → Siphon Life**, each cast-confirmed via
+`UNIT_CASTEVENT` → Life Tap top-up → Dark Harvest dispatch (channels on CD; pre-tops any
+DoT that would fall off mid-channel using Rapid-Deterioration-scaled estimates; wand-fills
+between CDs) → filler (wand with DoT-expiry stop, Shadow Bolt, or Drain Life).
+
+### Discrepancies
+
+| # | Ability / order | What the code does | What research says | Source + confidence | Recommended action | RISK if changed |
+|---|---|---|---|---|---|---|
+| L1 | **DoT order: Immolate leads; Corruption late** | Fixed order Immolate → curse → Corruption → Siphon Life (toggles choose WHICH, not the order) | Affliction core: "**Corruption + Curse of Agony + Siphon Life**" (Corruption first; Immolate isn't in the Affliction core at all); leveling: "Corruption → CoA" | rotations.md Affliction/Leveling `[T]` | **Report**: with Improved Corruption (instant), Corruption-first is the affliction convention. An order swap (or a per-profile order) is a small gated change | Immolate-first is right for Destruction (Immolate enables Conflagrate); a single fixed order can't serve both specs — that's the real design question |
+| L2 | **Conflagrate missing** | Not in the module | Destruction: "Immolate + **Conflagrate**" | rotations.md Destruction `[T]` | **Gap, report**: opt-in Conflagrate (consumes Immolate — needs the interaction handled: don't Conflag right before an Immolate refresh) | Conflag eats the Immolate DoT; naive addition would fight the upkeep loop it feeds on |
+| L3 | **Destruction as a config, not a mode** | "Destro" = filler:Shadow Bolt + Immolate on + DoTs off; no dedicated destro logic (Bane/Ruin are passive anyway) | "Shadow Bolt spam with Ruin + Imp SB debuff → CoE/CoS → Immolate (+ Conflagrate) → Shadowburn execute" | rotations.md Destruction `[T]` | **Doc note**: a README recipe for the destro profile config covers most of it; L2 is the only real code gap | — |
+| L4 | **Soul Link / Demonology pet defensives** | Not modeled (pet send/funnel only) | Demonology: Soul Link, Master Demonologist, pet management | rotations.md Demonology `[T]` | **Phase 4 scope** (defensives) — note only | — |
+
+### Match notes (checked, no discrepancy)
+
+- **Nightfall P0** matches "Shadow Bolt on Nightfall proc" exactly, with rising-edge
+  once-per-proc handling that's ahead of the research (and matches its "procs from
+  Corruption, Dark Harvest, drains" note by being source-agnostic). ✓
+- **Dark Harvest** "when up" ✓ — channel-on-CD with mid-channel DoT protection and
+  Rapid-Deterioration-scaled durations (cross-checked against Cursive's tables per the
+  0.13.14b changelog). Beyond research. ✓
+- **Malediction** CoA-coexistence is implemented (secondary CoA upkeep, correctly skipped
+  for CoA/CoD mains) ✓.
+- Shadowburn execute (shard-gated) ✓; Drain Soul shard banking ✓; Life Tap valves ✓;
+  16-debuff-cap pressure is answered by the per-DoT toggles (manual, as designed).
+
+---
+
+## Cross-class summary (headline items for sign-off)
+
+**Most likely real, cheapest to verify** (all `/sbr debug`-checkable in minutes):
+Paladin P1 (Zeal 3 vs 5), Warrior W2 (Thunder Clap in Defensive), Mage M4 (Arcane Surge
+availability), Druid D5 (Eclipse proc model).
+
+**Missing Turtle-core abilities** (each needs the live spell confirmed, then a gated
+opt-in): Shaman S1 Molten Blast (biggest single gap in the audit), S2 Chain Lightning,
+Warrior W1 Battle Shout, Druid D1 Savage Bite, Rogue R1 Surprise Attack, Mage M1 Hot
+Streak Pyroblast, Hunter H2 Explosive Trap, Warlock L2 Conflagrate, Priest PR4/PR5
+support-target buffs (design discussion first).
+
+**Order/emphasis questions to test on a dummy, not on paper**: Paladin P2/P3, Warrior
+W3 (SS vs Revenge), Priest PR1/PR2, Warlock L1, Rogue R2, Druid D3 (Tiger's Fury
+economics).
+
+**Fixed in this phase without the gate (pre-authorized)**: Hunter H1 — the Serpent Sting
+icon-fragment fallback (detection/display robustness; no priority change). See CHANGELOG.
+
+Everything else is template defaults or documentation, called out per-row above. **No
+rotation code was changed by this audit.**
