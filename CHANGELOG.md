@@ -4,6 +4,22 @@ All notable changes to **AutoRota** are documented here. Versions are listed new
 
 ---
 
+## v0.13.15b — Paladin heal-mode gating and heal-rank selection, Rogue rank trace, Assist fix for support modules
+
+**Fix + tuning.** Closes a heal-mode gating gap in the Paladin's damage rotation, reworks the heal-spell/rank choice with a QuickHeal-inspired efficiency comparison, and fixes the new Assist targeting mode being silently inert for any support module (currently only the paladin heal mode). Developed and tested in-game on a Holy Paladin.
+
+- **Rogue: max-rank trace.** `/ar trace` now reports the max known rank for every ability the rotation casts. All Rogue casts are bare `CastSpellByName(name)`, which vanilla already resolves to the highest known rank, so this line exists to make that fact verifiable in-game rather than assumed.
+- **Fix — Paladin damage/tank rotation steps leaking into heal mode.** *Strike*, *Holy Shield*, *Consecration*, *Hammer of Wrath*, *Repentance*, and *Exorcism* were missing a `not cfg.healMode` guard, so a toggle left on from the Damage tab (most visibly *Crusader Strike*) kept firing in heal mode outside its intended purpose (the Blessed Strikes Holy Shock reload), contradicting the Healer tab's own "Tank / Damage settings are ignored" description. All six steps are now gated consistently.
+- **Paladin: heal-rank selection reworked**, inspired by QuickHeal's approach:
+  - Healing-reduction debuffs (Mortal Strike and the like) inflate the effective deficit used for rank selection, then the committed/predicted heal is scaled back down since the extra healing never lands.
+  - In-combat cast-time compensation pads the deficit before rank selection, since the target keeps losing health while the cast is in flight.
+  - Below the Holy Shock emergency threshold, Flash of Light is kept over Holy Light even for a deficit it cannot fully cover — a fast partial heal beats risking the target dying mid-cast on a slow Holy Light.
+  - Outside the emergency case, Flash of Light and Holy Light are now compared by their actual landing heal (post-debuff-modifier) and whichever wastes less overheal wins, replacing a fixed threshold that forced Holy Light too early and could waste close to half the cast as overheal.
+- **Paladin UI**: the Holy Shock threshold slider's tooltip now mentions its secondary role gating the Flash of Light vs. Holy Light choice.
+- **Fix — Assist targeting mode was inert for support modules.** `/ar acquire assist <name>` reused the same guard that keeps `auto` from force-pulling a target for a healer, which also suppressed `assist` — mirroring an ally's already-selected target is not a fresh pull, so it never should have been gated the same way. Assist now runs unconditionally, which is also what lets a melee-holy healer's strike weaving (which needs an actual target) follow the tank hands-free.
+
+---
+
 ## v0.13.14b — Warlock: Dark Harvest overhaul, cast-confirmed DoT tracking, and a three-way targeting mode
 
 **Feature + fix.** A deep pass over the Warlock's Dark Harvest handling and DoT recast reliability, plus a new global targeting mode with GUID-based assist. Cross-checked against SuperCleveRoidMacros' and Cursive's own Dark Harvest / duration tables during development, so the base durations and the 30%-tick-boost math are no longer guesses.
