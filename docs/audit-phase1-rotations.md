@@ -123,4 +123,53 @@ Aimed on CD only when both proc-guard and opener mode are off.
 
 ---
 
-*(Sections 3-9 appended as each class is audited.)*
+## 3. SHAMAN (`classes/Class_Shaman.lua`)
+
+### What the code does
+
+Mode dispatch (enhancement / elemental / tank / restoration). **Enhancement**: melee swing
+→ shield upkeep → Bloodlust (opt-in) → Stormstrike → Lightning Strike → chosen shock on the
+shared CD (Flame Shock as maintained DoT) → totem upkeep (all four elements, one per press)
+→ Lightning Bolt filler (default ON). **Elemental**: shield → Elemental Mastery on CD →
+Flame Shock DoT upkeep (recast when the debuff drops; blind 12s timer without detection) or
+chosen shock on CD → totems → Lightning Bolt filler. **Tank**: shield → Earthshaker Slam
+taunt when the target isn't on you → Stormstrike → shock (Earth default) → Lightning Strike
+→ totems → optional LB. **Restoration**: Mana Tide ≤25% mana → NS-equivalent → instant
+max-rank Healing Wave (emergency ≤40%) → Lesser Healing Wave (≤50%, beats AoE) → Chain Heal
+(≥3 hurt) → downranked Healing Wave → Water Shield → totems → optional LB damage weave.
+Totem clocks are stamped by SuperWoW `UNIT_CASTEVENT` (manual drops reset the right slot)
+with 55s water / 110s other redrop timers.
+
+### Discrepancies
+
+| # | Ability / order | What the code does | What research says | Source + confidence | Recommended action | RISK if changed |
+|---|---|---|---|---|---|---|
+| S1 | **Elemental: Molten Blast missing** | Flame Shock is maintained by **recasting Flame Shock** when its debuff drops; Molten Blast is nowhere in the module | Core Turtle loop: "apply Flame Shock → **maintain it by casting Molten Blast in the last ~3s of the DoT** (Rekindled Flame) → fill with Lightning Bolt" — this is THE Turtle Elemental mechanic | rotations.md + turtle-mechanics.md `[T]` | **Headline gap, report**: add Molten Blast (KnowsSpell-gated) with a "refresh window" check on Flame Shock's remaining time. Needs Flame Shock's exact Turtle duration + Molten Blast CD; gated change with dummy verification | Without exact durations the refresh window can miss and drop the DoT (worse than today's recast). Must be built with `/sbr debug` timings, not paper numbers |
+| S2 | **Elemental: Chain Lightning missing** | No Chain Lightning anywhere (single LB filler) | "weave Chain Lightning only with haste/mana headroom (~3-4 LB : 1 CL)"; AoE = "spam Chain Lightning on 3+" | rotations.md `[T]` (ratio itself reads `[?]`-ish) | **Gap, report**: opt-in CL weave (mana-floor gated) + CL as the AoE spam. Gated | CL is mana-hungry; a bad ratio starves the mana pool — research itself calls Elemental bottom-tier, so headroom gating matters |
+| S3 | **Shaman has no AoE mode** | No `aoeMode` in the shaman profile at all; Magma/Fire Nova exist only as fire-slot totem picks | "AoE/dungeon: **Fire Nova Totem → Magma Totem → spam Chain Lightning** on 3+" | rotations.md `[T]` | **Gap, report**: add `/sbr aoe` for shaman (swap fire-slot to Nova/Magma + CL spam), mirroring other classes' AoE toggles. Gated | Modest — AoE toggle is opt-in by design; totem swapping mid-fight churns GCDs |
+| S4 | **Elemental: Earth Shock while moving** | Shock choice is static config (elemental template = flame); no movement awareness | "Earth Shock **while moving** or for a target dying before refresh" | rotations.md `[T]` | **Report**: Nampower's `PlayerIsMoving` (see docs/dependencies.md) makes this implementable; needs fork-availability check + gate | Depends on a Nampower API that must be confirmed on the live client first (`if PlayerIsMoving then`) |
+| S5 | **Flame Shock snapshot timing** | DoT recast purely on "debuff missing" | "Flame Shock (**snapshots** — time with trinket/EM/Nightfall procs)" | rotations.md `[T]` claim, proc-timing value `[?]` | **Note only** for now: proc-window snapshotting is a polish-tier optimization; record in the backlog | High complexity, low payoff until Molten Blast (S1) exists |
+| S6 | **Enhancement: LB filler default ON** | `lbFiller = true` in enhancement/starter templates — hardcasts LB between melee | Research Enhancement lists SS + LS + shocks + melee; no LB weave at endgame (casting stops swings) | rotations.md `[T]` silence vs code default | **User decision**: template default (leveling likes the filler; raid Enhancement probably wants it off). Existing profiles unaffected | Turning it off globally would gut low-level DPS where LB is the only button — keep it per-profile |
+| S7 | **Weapon imbue upkeep missing (Windfury/Rockbiter)** | No imbue handling in any spec | Enhancement: "melee with **Windfury weapon**"; Tank: "**Rockbiter affects ALL threat**" | rotations.md + turtle-mechanics.md `[T]` | **Already roadmapped**: Phase 2 `GetWeaponEnchantID` detection helper, then a gated rotation hook. No action in Phase 1 | — |
+| S8 | **Tank: Earth Shock vs Lightning Strike order** | Taunt → Stormstrike → shock → Lightning Strike | "Lightning Strike + Earth Shock for threat" (no explicit order); tank spec "in active dev" on Turtle | rotations.md `[T]`/dev-moving | **No change**: order unverifiable on paper; dummy/threat-meter test when the user plays tank | — |
+| S9 | **Earthshaker Slam / NS-equivalent / totem names** | Best-effort names, KnowsSpell-gated, README flags them for in-game confirmation | Research doesn't document them | code ahead of research `[?]` | **Verify in-game** then backfill rotations.md; inert if wrong | — (no-op if names wrong) |
+
+### Match notes (checked, no discrepancy)
+
+- Elemental core shape (Flame Shock DoT + LB-as-Electrify-builder, Electrify never ramped
+  explicitly) matches `[T]` — Electrify builds passively in code exactly as research says
+  it should (no dedicated logic = correct).
+- Elemental Mastery on CD when enabled ✓ (research: "on CD, weak").
+- Stormstrike before shock (buff → consume) ✓; SS/LS as talent abilities auto-detected via
+  KnowsSpell ✓.
+- Restoration priority (Mana Tide → NS+HW → LHW emergency → Chain Heal ≥3 → downranked HW →
+  Water Shield → totems) matches the `[V]` sketch; rank tables are flagged in-code as
+  vanilla baselines pending the Phase 3 live tuning — consistent with research's own
+  "needs `[?]` tuning".
+- The cross-spec totem system with `UNIT_CASTEVENT` stamping is beyond research; Phase 2
+  adds destruction detection. Redrop intervals (55s/110s) are already flagged in-code for
+  Turtle-duration tuning. ✓
+
+---
+
+*(Sections 4-9 appended as each class is audited.)*
