@@ -125,14 +125,55 @@ CHANGELOG v0.14.1 and audit item H1).
 ### Combat (raid/dungeon DPS — only endgame-viable spec) `[T]`
 Sinister Strike (Improved SS baseline; Swift Strikes adds attack speed) to build combo
 points → **Slice and Dice uptime = top priority** → Rupture / Eviscerate finishers.
-- **Surprise Attack** (Combat 5th-row capstone): 120% weapon dmg, 10 energy, usable after
-  target dodges, can't be dodged/parried/blocked.
+- **Surprise Attack** (Combat capstone, 20 Combat points — Rank 1/1, in-game tooltip
+  confirmed; supersedes the earlier "120% weapon dmg" estimate below): 10 energy, instant,
+  25% of Attack Power as damage, guaranteed to land (can't be blocked/dodged/parried),
+  1 combo point. Usable only after the TARGET dodges your attack. Implemented in Aegis_SBR
+  as a reactive window mirroring Riposte's parry tracker, but on
+  `CHAT_MSG_COMBAT_SELF_MISSES` filtered for "dodge" instead of
+  `CHAT_MSG_COMBAT_CREATURE_VS_SELF_MISSES` filtered for "parry" (audit R1, implemented —
+  window length carried over from Riposte's 5.5s as a placeholder, **unverified for
+  Surprise Attack specifically**; tune via `/sbr trace`'s `sa=` field if it proves too
+  short/long in practice).
 - Blade Flurry + Adrenaline Rush burst. Blade Rush scales energy-tick regen with agility.
 - Combo points no longer vanish on target switch (reset fresh). Rogues can use 1H axes.
+- **Noxious Assault does not apply here** (see Assassination below) — it requires 31
+  Assassination points, which a Combat build never has, so Aegis_SBR's auto-builder
+  preference for it over Sinister Strike is a non-issue for Combat in practice (audit R3).
+- **Slice and Dice 1-CP cheap-refresh model, resolved (audit R2)**: Aegis_SBR only refreshes
+  SnD immediately when combo points happen to be exactly 1 (otherwise it dumps into
+  Eviscerate first and catches the refresh on a later pass) — cheap on combo points, but in
+  theory risks a brief SnD downtime gap while waiting to cycle back to 1cp. **Ruthlessness**
+  (Assassination, 6-8 points, 3/3 = 100% chance, in-game tooltip confirmed: "finishing moves
+  have a 100% chance to add a combo point to your target") closes that gap in practice: every
+  finisher (Eviscerate included) immediately regenerates to exactly 1 combo point, so the
+  cheap-refresh window recurs on the very next press after every single finisher, not after
+  several builder hits. Since Ruthlessness is an early, low-cost pick that most serious
+  Combat/hybrid builds take regardless of final spec, the existing model needs no change for
+  the practical case. A hypothetical 0-Assassination-point Combat rogue (rare, generally
+  suboptimal) would still see the original gap — noted, not acted on.
 
 ### Assassination `[T]` (weaker)
 Poison-focused; not endgame-competitive (Combat is the only viable PvE spec to late
 AQ40/Naxx).
+- **Noxious Assault** (Assassination end talent, 31 points — Rank 1/1, in-game tooltip
+  confirmed): 45 energy, instant, 5yd, strikes with **both** weapons for 30 + 30% AP and
+  **guarantees** poison application from both weapons; 1 combo point. Compare **Sinister
+  Strike** R6 (lvl 46, tooltip confirmed): 40 energy, instant, main-hand only, +33 flat on
+  top of melee damage, normal (non-guaranteed) poison proc chance; 1 combo point.
+  Despite costing 5 more energy, Noxious Assault wins on total value whenever poisons are
+  applied — a full second weapon hit plus two guaranteed procs (vs. one chance-based proc)
+  outweighs the energy premium. Confirms Aegis_SBR's auto-builder (prefers Noxious Assault
+  whenever known, else Sinister Strike) is correct; the 31-point requirement means this only
+  ever applies to a deep/pure Assassination build, matching the module's own "Assassination
+  flavoured" design intent (audit R3, resolved — no code change).
+- **Envenom** (Assassination talent, ~21 points deep — Rank 1/1, in-game tooltip confirmed):
+  20 energy, instant, **finisher** (consumes combo points, not a builder). Self-buff: +30%
+  poison effectiveness and +30% poison application chance on the rogue. Duration scales by
+  combo points spent at cast: 1cp=12s, 2cp=16s, 3cp=20s, 4cp=24s, 5cp=28s — matches
+  Aegis_SBR's `ENV_DUR = {12, 16, 20, 24, 28}` exactly. Confirms the code's model (self-buff
+  refreshed cheaply at 1 combo point, dumped into Eviscerate above that, mirroring the
+  Slice-and-Dice upkeep pattern) is correct (audit R4, resolved — no code change).
 
 ### Subtlety (dungeon support) `[T]` (niche)
 Ambush/Backstab; Honor Among Thieves (party crits → 5 energy); Cloaked in Shadows party
@@ -141,6 +182,21 @@ damage bubble via low-CD Vanish (Elusiveness); Serrated Blades garrote.
 ### Leveling `[T]`
 Combat (swords or daggers). Dagger: Ambush → Gouge → pool energy → Backstab →
 Eviscerate/Rupture; kite with Crippling Poison + Rupture.
+
+### ⏸ Deferred (audit R5): no stealth opener `[?]`
+Aegis_SBR's rotation never checks for Stealth — it starts straight at the normal builder
+even when opening from stealth, so an Ambush-type opener is left on the table. Confirmed
+**not worth adding for the two specs the addon actually targets**: Assassination (dagger)
+already out-damages a stealth opener with Noxious Assault + its guaranteed double poison
+proc (audit R3), and Combat (sword/axe) can't cast Ambush at all (dagger-only requirement).
+The remaining case — a Subtlety or dagger-leveling player who wants a proper stealth-opener
+weave (Ambush, optionally Gouge → energy-pool → Backstab per the Leveling line above) —
+is real but **deliberately deferred**: neither maintainer currently plays Combat or
+Subtlety, so a design (energy pooling? which opener?) can't be validated in-game right now.
+Sketch discussed and available if someone picks this up: a toggle gated on a Stealth-buff
+check (mirrors the existing `SelfBuffUp` helper), Ambush as priority 0 before Riposte, no
+pooling logic initially. **Not implemented — pick this back up only with someone able to
+test a Combat or Subtlety build.**
 
 ### PvP/defensive (Phase 4, note only)
 Vanish, Blind, Evasion, Cloak, Kidney Shot, Improved Gouge.

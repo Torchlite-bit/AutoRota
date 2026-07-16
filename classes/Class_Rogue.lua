@@ -10,6 +10,12 @@
 --    Eviscerate above that, mirroring the proven ExAutoRogue logic.
 --  * Eviscerate is the finisher once combo points reach the threshold.
 --  * Riposte fires inside the parry window when learned and enabled.
+--  * Surprise Attack fires inside the target's dodge window when learned and
+--    enabled - a Combat capstone (20 Combat points), the mirror image of
+--    Riposte: it reacts to the TARGET dodging OUR attack rather than us
+--    parrying theirs. Guaranteed hit (unblockable/undodgeable/unparryable),
+--    cheap (10 energy), and awards a combo point, so it is worth interrupting
+--    the normal builder/finisher flow for whenever the window is open.
 --  * Adrenaline Rush and Blade Flurry are off-GCD, cast on demand or
 --    automatically against elite and boss targets.
 -- ============================================================
@@ -36,14 +42,17 @@ M.BUILDERS = { "Sinister Strike", "Backstab", "Hemorrhage", "Noxious Assault", "
 M.templates = {
     starter = {  -- valid for any rogue, only Slice and Dice upkeep
         builder = "", useSnd = true, useEnvenom = false, useRupture = false, useRiposte = false,
+        useSurpriseAttack = false,
         cpFinish = 4, popCDs = false, autoCDElite = false,
     },
     assassination = {
         builder = "", useSnd = true, useEnvenom = true, useRupture = true, useRiposte = true,
+        useSurpriseAttack = false,
         cpFinish = 4, popCDs = false, autoCDElite = false,
     },
     combat = {
         builder = "", useSnd = true, useEnvenom = false, useRupture = false, useRiposte = false,
+        useSurpriseAttack = true,
         cpFinish = 5, popCDs = false, autoCDElite = true,
     },
 }
@@ -64,6 +73,7 @@ function M:NormalizeProfile(c)
     if c.useEnvenom == nil then c.useEnvenom = false end
     if c.useRupture == nil then c.useRupture = false end
     if c.useRiposte == nil then c.useRiposte = false end
+    if c.useSurpriseAttack == nil then c.useSurpriseAttack = false end
     if c.cpFinish == nil then c.cpFinish = 4 end
     if c.popCDs == nil then c.popCDs = false end
     if c.autoCDElite == nil then c.autoCDElite = false end
@@ -143,6 +153,7 @@ function M:Rotate(cfg)
             .. " env=" .. (useEnv and (self:SelfBuffUp("Envenom", "Sword_31") and "up" or "down") or "-")
             .. " rup=" .. (useRup and (self:TargetDebuffUp("Rupture", "Ability_Rogue_Rupture") and "up" or "down") or "-")
             .. " rip=" .. ((cfg.useRiposte and now < (self.riposteExpiry or 0)) and "Y" or "N")
+            .. " sa=" .. ((cfg.useSurpriseAttack and now < (self.surpriseExpiry or 0)) and "Y" or "N")
             .. " elite=" .. (isElite and "Y" or "N"),
             -- Rogue never downranks (all ranks cost the same energy), so every
             -- Cast() below is a bare CastSpellByName(name) - vanilla resolves
@@ -154,12 +165,22 @@ function M:Rotate(cfg)
             .. (useSnd and ("  SnD=R" .. self:MaxRank("Slice and Dice")) or "")
             .. (useEnv and ("  Envenom=R" .. self:MaxRank("Envenom")) or "")
             .. (useRup and ("  Rupture=R" .. self:MaxRank("Rupture")) or "")
-            .. ((cfg.useRiposte and self:KnowsSpell("Riposte")) and ("  Riposte=R" .. self:MaxRank("Riposte")) or ""))
+            .. ((cfg.useRiposte and self:KnowsSpell("Riposte")) and ("  Riposte=R" .. self:MaxRank("Riposte")) or "")
+            .. ((cfg.useSurpriseAttack and self:KnowsSpell("Surprise Attack")) and ("  SurpriseAttack=R" .. self:MaxRank("Surprise Attack")) or ""))
     end
 
     -- P1 Riposte, combo point independent, only inside the parry window
     if cfg.useRiposte and self:KnowsSpell("Riposte") and now < (self.riposteExpiry or 0) then
         CastSpellByName("Riposte")
+        return
+    end
+
+    -- P1b Surprise Attack, combo point independent, only inside the target's
+    -- dodge window. Guaranteed to land and cheap, so like Riposte it jumps the
+    -- normal builder/finisher queue rather than waiting its turn - missing the
+    -- window wastes the proc entirely.
+    if cfg.useSurpriseAttack and self:KnowsSpell("Surprise Attack") and now < (self.surpriseExpiry or 0) then
+        CastSpellByName("Surprise Attack")
         return
     end
 
@@ -250,6 +271,25 @@ riposteFrame:SetScript("OnEvent", function()
     if event == "CHAT_MSG_COMBAT_CREATURE_VS_SELF_MISSES" then
         if arg1 and string.find(string.lower(arg1), "parry") then
             M.riposteExpiry = GetTime() + 5.5
+        end
+    end
+end)
+
+-- ============================================================
+-- Dodge window tracker for Surprise Attack - the mirror image of the parry
+-- tracker above: OUR attack getting dodged by the target, not us parrying
+-- theirs, so it listens on CHAT_MSG_COMBAT_SELF_MISSES instead. The 5.5s
+-- window length is carried over from Riposte's (audit R1: Turtle's actual
+-- Surprise Attack window is unconfirmed - verify in-game and adjust if it
+-- turns out shorter/longer, e.g. by watching how often "sa=Y" in /sbr trace
+-- goes stale before a press catches it).
+-- ============================================================
+local surpriseFrame = CreateFrame("Frame")
+surpriseFrame:RegisterEvent("CHAT_MSG_COMBAT_SELF_MISSES")
+surpriseFrame:SetScript("OnEvent", function()
+    if event == "CHAT_MSG_COMBAT_SELF_MISSES" then
+        if arg1 and string.find(string.lower(arg1), "dodge") then
+            M.surpriseExpiry = GetTime() + 5.5
         end
     end
 end)
