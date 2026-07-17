@@ -4,7 +4,7 @@ Aegis_SBR is built on three client mods. This documents what each one actually p
 APIs, events, behaviors, and gotchas — so rotation code targets them correctly instead of
 assuming vanilla or retail behavior. **Verify against the versions actually installed on the
 user's client**; all three projects have moved forks and changed APIs over time (notes
-below). Last researched: 2026.
+below). Last researched: 2026-07-17 (SuperWoW refreshed through 2.2).
 
 ---
 
@@ -20,16 +20,24 @@ metadata. This is the backbone of Aegis's targeting and cast detection.
   cast at a specific unit/GUID without targeting it. Core to acting on off-target units.
 - **`UNIT_CASTEVENT`** — fires on cast activity for any unit. Args (1.12 globals):
   `arg1` = caster GUID, `arg2` = target GUID, `arg3` = event type
-  (`"START"` / `"CAST"` / `"CHANNEL"` / `"FAIL"` etc.), `arg4` = spell ID,
+  (`"START"` / `"CAST"` / `"CHANNEL"` / `"FAIL"`, plus **`"MAINHAND"` / `"OFFHAND"` for
+  auto-attack swings** — Features wiki, verified 2026-07-17), `arg4` = spell ID,
   `arg5` = cast duration (ms). Aegis registers this and dispatches `"CAST"` events to the
   active module's `OnCastEvent(caster, target, spellName)` after resolving the ID → name
   via `SpellInfo`. (Used today for Shaman totem-drop tracking; the basis for future
-  interrupt/defensive detection.)
-- **`SpellInfo(spellID)`** → returns spell name (and more). Aegis uses it to turn the
-  `UNIT_CASTEVENT` numeric spell ID into a name for matching.
+  interrupt/defensive detection.) ⭐ **The swing events are rotation-relevant:** an exact
+  event-driven swing timer could replace the combat-log text parsing behind seal twisting
+  and on-next-swing windows (audit items P8 / W6) — verify they fire on Turtle's bundled
+  build first; any adoption that changes ability timing goes through the audit gate.
+- **`SpellInfo(spellID)`** → per the Features wiki returns **name, rank, texture file, and
+  min/max range to the target** (verified 2026-07-17). Aegis currently uses only the name
+  (ID → name for `UNIT_CASTEVENT` matching); the range returns are a future option for
+  range gating without `CheckInteractDistance`.
 - **Combat-log / owner tagging** — SuperWoW exposes the owner of pets/totems/guardians in
   combat-log context, which is what makes **totem destruction detection** feasible
   (roadmap Phase 2): tag a totem's GUID on cast, watch for its death with owner = player.
+  A **`RAW_COMBATLOG`** event (raw versions of all combat-log events; Features wiki) exists
+  as a lower-level hook if the parsed log proves lossy for that detection.
 
 **Gotchas:**
 - GUIDs are large numbers — be careful never to compare them as truncated Lua numbers where
@@ -47,10 +55,10 @@ own SuperWoW build and the number may not track upstream exactly. Aegis targets 
 1.18.1's bundled SuperWoW; **confirm which functions actually exist on the live client before
 relying on them.**
 
-**Version history relevant to Aegis** (from the SuperWoW wiki Changelog; 2.1 is user-provided
-and not yet independently confirmed against the wiki as of this writing):
+**Version history relevant to Aegis** (from the SuperWoW wiki Changelog, re-verified
+**2026-07-17**; the wiki's newest entry is **2.2, 16/07/2026**):
 
-*2.0 (July 2026) — confirmed from wiki Changelog:*
+*2.0 (10/07/2026) — confirmed from wiki Changelog:*
 - `CastSpellByName(spell, "CLICK")` — second arg `"CLICK"` instantly casts a reticle/ground
   spell at the mouseover location, bypassing the targeting-circle step. (Useful later for
   ground-targeted totems/traps/AoE without a manual click — but a rotation change, so gated.)
@@ -67,7 +75,8 @@ and not yet independently confirmed against the wiki as of this writing):
 - Nameplate/chat-bubble CVars (`NameplateRange`, `NameplateMotion` 0/1/2, `ChatBubbleRange`,
   `HealingText`, etc.) and `CREATE_CHATBUBBLE` event. (Not combat-relevant.)
 
-*2.1 (15/07/2026) — USER-PROVIDED (record, verify on client before use):*
+*2.1 (15/07/2026) — wiki-CONFIRMED 2026-07-17 (matches the earlier user-provided notes;
+still presence-gate every function on Turtle's bundled build before relying on it):*
 - **`GetWeaponEnchantID(unit)` → mainhand, offhand temporary enchant IDs.** ⭐ **This is the
   rotation-relevant one.** It lets the engine detect whether a *temporary* weapon enchant is
   currently active — Windfury/Rockbiter/Flametongue/Frostbrand imbues (Shaman), sharpening/
@@ -76,12 +85,26 @@ and not yet independently confirmed against the wiki as of this writing):
   poison-uptime awareness, Warrior/any-class stone/oil upkeep. See roadmap "Weapon-enchant
   awareness" item. Returns an ID (not a name) — Aegis would map known imbue/poison enchant IDs
   to meaning, or just test presence/change.
+- **Related, from the Features wiki (SuperWoW version not stated — confirm on client):
+  `GetWeaponEnchantInfo()` accepts a friendly player unit argument** (e.g. `"party1"`) and
+  reports the temporary enchant on that player's main/offhand — per the wiki it surfaces the
+  enchant **NAME**, which would spare Aegis the ID→meaning mapping entirely. Verify the exact
+  return values in-game before building the Phase 2 helper on it.
 - `GetSendMailItemLink()`, `GetInboxItemLink(itemIndex)` — mail item hyperlinks. (Not
   combat-relevant.)
 - `GetQuestID(questIndex)`, `GetQuestLink(questID)` — questlog ID + hyperlink (fills client
   cache from server, fires `QUEST_LOG_UPDATE` on a cache miss). Tooltip `SetHyperlink` now
-  supports quest links. (Not combat-relevant.)
+  supports quest links. (Not combat-relevant; **renamed in 2.2 — see below, use the 2.2
+  names.**)
 - NameplateMotion Smart Spread improvements.
+
+*2.2 (16/07/2026) — confirmed from wiki Changelog:*
+- NameplateMotion smart-spread improvements + a new compact spread mode. (Not
+  combat-relevant.)
+- **Quest functions refactored/renamed**: `GetQuestIDForLogIndex(questIndex)`,
+  `GetQuestLinkForLogIndex(questIndex)`, `GetQuestLinkForID(questID)` replace 2.1's
+  short-lived `GetQuestID`/`GetQuestLink`. If anything ever touches these, presence-gate
+  and prefer the 2.2 names. (Not combat-relevant.)
 
 - Feature reference: https://github.com/balakethelock/SuperWoW/wiki/Features ·
   Changelog: https://github.com/balakethelock/SuperWoW/wiki/Changelog

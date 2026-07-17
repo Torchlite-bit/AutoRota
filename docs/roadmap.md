@@ -157,7 +157,9 @@ from the polish backlog if built.
   expiry timers.
 - **Heal-engine dedupe**: unify the four near-identical heal engines
   (Paladin/Priest/Druid/Shaman) into one shared module; class modules pass config in.
-- **Weapon-enchant awareness (SuperWoW 2.1 `GetWeaponEnchantID(unit)`)**: add a shared helper
+- **Weapon-enchant awareness (SuperWoW 2.1 `GetWeaponEnchantID(unit)`, wiki-confirmed
+  2026-07-17; see also `GetWeaponEnchantInfo(unit)` which per the Features wiki reports
+  enchant NAMES — details in `docs/dependencies.md`)**: add a shared helper
   that reports whether a temporary main-hand/off-hand enchant is active, so the engine can
   react to imbue/poison/oil/stone uptime. Primary targets: **Enhancement Shaman** (Windfury/
   Rockbiter/Flametongue/Frostbrand imbue upkeep), **Rogue** (poison-as-enchant uptime),
