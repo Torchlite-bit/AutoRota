@@ -25,6 +25,7 @@ function M:BuildBody(ui, parent)
     self.envRow = L:Row{ key = "useEnvenom", label = "Envenom", spell = "Envenom", onToggle = set("useEnvenom") }
     self.rupRow = L:Row{ key = "useRupture", label = "Rupture", spell = "Rupture", onToggle = set("useRupture") }
     self.ripRow = L:Row{ key = "useRiposte", label = "Riposte", spell = "Riposte", onToggle = set("useRiposte") }
+    self.saRow = L:Row{ key = "useSurpriseAttack", label = "Surprise Attack", spell = "Surprise Attack", onToggle = set("useSurpriseAttack") }
     self.cpRow = L:Row{ label = "Eviscerate at CP",
         slider = { key = "cpFinish", min = 1, max = 5, step = 1, suffix = "", onChange = set("cpFinish") } }
 
@@ -39,6 +40,7 @@ function M:BuildBody(ui, parent)
     ui:Tip(self.envRow.cb, "Envenom", "Kept up the same way as Slice and Dice (Turtle ability).")
     ui:Tip(self.rupRow.cb, "Rupture", "Applied as a finisher at your combo-point threshold when it falls off the target.", "With the Assassination talent Taste for Blood, keeping it up is also a stacking damage buff.")
     ui:Tip(self.ripRow.cb, "Riposte", "Cast right after a parry, inside the short Riposte window.")
+    ui:Tip(self.saRow.cb, "Surprise Attack", "Cast right after the TARGET dodges you, inside a short window (mirror image of Riposte).", "Combat capstone (20 points). Guaranteed hit, cheap, awards a combo point.")
     ui:Tip(self.cpRow.slider, "Finisher combo points", "Eviscerate is used once combo points reach this number.")
     ui:Tip(self.cdRow.cb, "Pop cooldowns", "Use Adrenaline Rush and Blade Flurry every press (off the global cooldown).")
     ui:Tip(self.cdEliteRow.cb, "Auto on elite", "Pop the cooldowns only against elite and boss targets.")
@@ -63,6 +65,7 @@ function M:RefreshBody(ui, buf)
     ui:BindCheck(self.envRow, buf.useEnvenom)
     ui:BindCheck(self.rupRow, buf.useRupture)
     ui:BindCheck(self.ripRow, buf.useRiposte)
+    ui:BindCheck(self.saRow, buf.useSurpriseAttack)
     ui:BindCheck(self.cdRow, buf.popCDs)
     ui:BindCheck(self.cdEliteRow, buf.autoCDElite)
 

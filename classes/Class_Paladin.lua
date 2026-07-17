@@ -161,7 +161,7 @@ M.templates = {
         hpManage = false, hpLow = 30, hpHigh = 70,
         strikeStyle = "autodps",
         spells = { holyStrike = false, crusaderStrike = false, holyShield = false, hammerOfWrath = false, repentance = false },
-        healMode = true, healThreshold = 90, useHolyShock = true, holyShockPct = 50, healPower = 0,
+        healMode = true, healThreshold = 75, useHolyShock = true, holyShockPct = 50, healPower = 0,
         healWeaveManaFloor = 40, healReloadCS = true, healSplashHS = true,
         healManaSelf = true, healManaJudge = false,
     },
@@ -251,7 +251,7 @@ function M:NormalizeProfile(c)
     -- Coerce to a strict boolean. This also repairs any profile corrupted by the
     -- old tab bug, which could store the string "damage" (truthy) into healMode.
     c.healMode = (c.healMode == true)
-    if c.healThreshold == nil then c.healThreshold = 90 end
+    if c.healThreshold == nil then c.healThreshold = 75 end
     if c.useHolyShock == nil then c.useHolyShock = true end
     if c.holyShockPct == nil then c.holyShockPct = 50 end
     -- Split the old single heal-weave toggle into two independent behaviours
@@ -604,16 +604,25 @@ end
 -- ============================================================
 
 -- Record an in-flight heal so the next press does not pile onto the same unit.
+-- Also stamps their real HP at commit time (see PendingFor).
 function M:CommitHeal(unit, amount, castTime)
     self.healTarget = UnitName(unit)
     self.healAmount = amount or 0
     self.healUntil = GetTime() + (castTime or 0) + 1.0
+    self.healBaseline = UnitHealth(unit)
 end
 
--- Predicted incoming heal for a unit from our own pending cast, else 0.
+-- Predicted incoming heal for a unit from our own pending cast, else 0. Only
+-- trusted while their REAL health hasn't dropped below what it was at commit
+-- time - otherwise new damage landed after the heal was queued, and letting
+-- the stale prediction pad WorstHurt's health estimate back up would mask a
+-- fresh crisis for the rest of the cast (up to ~castTime + 1s) instead of
+-- reacting to it immediately.
 function M:PendingFor(unit)
     if self.healTarget and GetTime() < self.healUntil and UnitName(unit) == self.healTarget then
-        return self.healAmount
+        if UnitHealth(unit) >= (self.healBaseline or 0) then
+            return self.healAmount
+        end
     end
     return 0
 end
@@ -664,7 +673,7 @@ end
 -- and keeps a Seal of Wisdom judgement from stealing the global cooldown.
 function M:HealDemand(cfg)
     if self.healUntil and GetTime() < self.healUntil then return true end
-    local ratio = (cfg.healThreshold or 90) / 100
+    local ratio = (cfg.healThreshold or 75) / 100
     local units = self:GroupUnits()
     for i = 1, table.getn(units) do
         local u = units[i]
@@ -757,7 +766,7 @@ end
 -- target is below the emergency line, where Flash of Light's faster cast
 -- stays the safer bet even if it cannot fully cover the deficit.
 function M:DoHeal(cfg)
-    local ratio = (cfg.healThreshold or 90) / 100
+    local ratio = (cfg.healThreshold or 75) / 100
     local unit, deficit, pct = self:WorstHurt(ratio)
     if not unit then return false end
 
@@ -882,7 +891,7 @@ function M:HealStrikeEngine(cfg)
     if not self:BlessedReloadUsable() then return false end
     if self:OwnCDReady("Holy Shock") then return false end          -- already loaded
     if not self:IsReady("Crusader Strike") then return false end
-    local _, _, pct = self:WorstHurt((cfg.healThreshold or 90) / 100)
+    local _, _, pct = self:WorstHurt((cfg.healThreshold or 75) / 100)
     if pct and pct <= (cfg.holyShockPct or 50) / 100 then return false end
     if not self:HealMeleeReady(cfg) then return false end
     return self:CastStrike("Crusader Strike", cfg)
@@ -895,6 +904,11 @@ end
 function M:HealWeaveStrike(cfg)
     if not cfg.healSplashHS then return false end
     if not self:HealMeleeReady(cfg) then return false end
+    -- Only worth the GCD if someone actually has a scratch to top off - by the
+    -- time this runs, HealStrikeEngine/DoHeal/HealDemand have already ruled out
+    -- anyone below the priority threshold, but a fully-topped group (everyone at
+    -- 100%) would otherwise still eat a splash cast for pure overheal.
+    if not self:WorstHurt(1.0) then return false end
     local maxm = UnitManaMax("player")
     if not maxm or maxm == 0 then return false end
     if UnitMana("player") / maxm * 100 < (cfg.healWeaveManaFloor or 40) then return false end
