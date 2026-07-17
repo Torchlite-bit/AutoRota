@@ -16,8 +16,8 @@ and don't trust the wrong source.
 | Source | Fetchable by Claude Code? | Use it for | Last verified |
 |---|---|---|---|
 | `docs/TALENTS_1_18_1.md` | ✅ It's a committed file | **Talent trees / spec talent data — THE talent source of truth** | (repo) |
-| SuperWoW **Changelog** wiki — https://github.com/balakethelock/SuperWoW/wiki/Changelog | ✅ Fetches cleanly | Dependency updates (SuperWoW versions/API) | 2026-07-15 (through 2.0; 2.1 user-provided) |
-| SuperWoW **Features** wiki — https://github.com/balakethelock/SuperWoW/wiki/Features | ✅ Fetches cleanly | Dependency API surface | 2026-07-15 |
+| SuperWoW **Changelog** wiki — https://github.com/balakethelock/SuperWoW/wiki/Changelog | ✅ Fetches cleanly | Dependency updates (SuperWoW versions/API) | 2026-07-17 (through **2.2**; the 2.1 user-provided notes are now wiki-confirmed) |
+| SuperWoW **Features** wiki — https://github.com/balakethelock/SuperWoW/wiki/Features | ✅ Fetches cleanly | Dependency API surface | 2026-07-17 (added UNIT_CASTEVENT swing types, SpellInfo extended returns, RAW_COMBATLOG, GetWeaponEnchantInfo(unit)) |
 | Nampower (avitasia fork) `SCRIPTS.md` / `EVENTS.md` — gitea.com/avitasia/nampower | ✅ Search/fetch works | Dependency updates (queue API, events) | 2026-07-15 |
 | SuperCleveRoidMacros wiki — https://github.com/jrc13245/SuperCleveRoidMacros/wiki | ✅ Fetches cleanly | Dependency updates (conditionals, reqs) | 2026-07-15 (repo archived/stable) |
 | Turtle WoW Wiki — https://turtle-wow.fandom.com | ✅ Fetches cleanly | Confirmed custom mechanics | 2026-07-15 |
