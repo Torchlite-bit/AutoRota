@@ -591,8 +591,13 @@ end
 -- Rotation. Strict single-cast priority with early returns, so exactly
 -- one spell is chosen per press. Casting more than one CastSpellByName
 -- per frame is unreliable in 1.12 (a later call overrides an earlier
--- one), which would invert the priority. The strike queues on the next
--- swing even out of range, so the swing start stays smooth.
+-- one), which would invert the priority. The strike (Holy Strike/Crusader
+-- Strike) is a plain GCD-consuming instant cast, same as Judgement below it -
+-- confirmed in-game (audit P2); it does NOT queue on the next swing the way
+-- an off-GCD ability would. Strike still leads Judgement in this priority
+-- deliberately: threat generation on the first Holy Strike matters for
+-- tanking, and Holy Might/Zeal buff upkeep matters for Retribution - both
+-- outweigh a Judgement/debuff briefly waiting one extra press.
 -- Priority: 0 pre-cast seal while running in, 1 strike, 2 Holy Shield,
 -- 2b Consecration (when AoE-toggled on), 3 seals/judgement, 4 Hammer,
 -- 5 Repentance, 6 Exorcism (undead/demon). Exorcism stays low so it never
@@ -641,9 +646,15 @@ function M:GroupUnits()
     return units
 end
 
--- Self is always reachable; others must be within heal range.
+-- Self is always reachable; others must be within heal range. Uses
+-- IsSpellInRange against the longest-range known heal (Flash of Light/Holy
+-- Light, both 40yd) for an exact answer instead of CheckInteractDistance's
+-- ~28yd proxy, which under-filtered by 12yd. Falls back to the proxy only if
+-- neither heal is learned yet (very early leveling).
 function M:Reachable(u)
     if UnitIsUnit(u, "player") then return true end
+    if self:KnowsSpell("Flash of Light") then return IsSpellInRange("Flash of Light", u) == 1
+    elseif self:KnowsSpell("Holy Light") then return IsSpellInRange("Holy Light", u) == 1 end
     return CheckInteractDistance(u, 4)
 end
 
@@ -791,10 +802,23 @@ function M:DoHeal(cfg)
     local rankDeficit = (hdb < 1) and (deficit / hdb) or deficit
 
     -- Holy Shock: instant, for an emergency or a hurt unit out of melee range.
+    -- Holy Shock's own range (20yd) is shorter than Flash of Light/Holy
+    -- Light's (40yd); IsSpellInRange gives an exact answer (the same API the
+    -- default action bar and hotbar addons use to red-tint an out-of-range
+    -- icon), so it gates the actual cast precisely - a target between 20 and
+    -- 40yd now correctly falls straight through to Flash of Light/Holy Light
+    -- below instead of wasting the press on a Holy Shock that would have
+    -- failed to reach (this was the bug: previously nothing was cast at all
+    -- for a hurt unit sitting in that 20-40yd gap).
     if cfg.useHolyShock and self:KnowsSpell("Holy Shock") and self:OwnCDReady("Holy Shock")
-        and (pct <= (cfg.holyShockPct or 50) / 100 or not CheckInteractDistance(unit, 3)) then
+        and (pct <= (cfg.holyShockPct or 50) / 100 or not CheckInteractDistance(unit, 3))
+        and IsSpellInRange("Holy Shock", unit) == 1 then
         local hs, amt = self:PickRank("Holy Shock", hsEff, self.HS_MANA, rankDeficit, mana)
-        if hs then self:CommitHeal(unit, amt * hdb, 0); self:CastOn(hs, unit); return true end
+        if hs then
+            self:CommitHeal(unit, amt * hdb, 0)
+            self:CastOn(hs, unit)
+            return true
+        end
     end
 
     -- Cast-time compensation: the target keeps losing health while the cast
