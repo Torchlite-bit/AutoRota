@@ -56,11 +56,27 @@ intentionally removed.
 ### Retribution (raid/dungeon DPS) `[T]`
 Keep a Seal up at ALL times → Judgement on CD (respect swing timer; never white-swing
 seal-less) → **Holy Strike on CD** (mana-free; returns mana via Judgement of Wisdom) → ramp
-**Crusader Strike to 5 stacks of Zeal** → Consecration if mana allows.
+**Crusader Strike to 3 stacks of Zeal** (corrected — audit P1, resolved: in-game spell
+description confirms the Zeal buff caps at 3, not 5 as originally recorded here; matches
+Aegis_SBR's existing `ZEAL_STACKS = 3`, so no code change needed) → Consecration if mana
+allows.
 - Seal choice: **Seal of Righteousness preferred** in most cases (can trigger Windfury /
   Crusader enchants); Seal of Command for slow-weapon burst.
+- **Judgement vs. strike order (audit P2), decided — no code change.** Confirmed in-game:
+  both the strike and Judgement are plain GCD-consuming instants (the strike does not queue
+  on the next swing free of the GCD, correcting a stale code comment that assumed
+  otherwise). This makes the research's "Judgement on CD" ahead of the strike a real,
+  actionable order question, not a moot one - but the decision is to keep the strike ahead
+  of Judgement as Aegis_SBR already does: threat generation on the first Holy Strike matters
+  for Protection, and Holy Might/Zeal buff upkeep matters for Retribution, both outweighing
+  a Judgement/debuff refresh occasionally waiting one extra press.
 - Because CS + Holy Strike share the 6s CD, the practical loop is "one strike / 6s +
   Judgement + reseal."
+- **`sealTwist` default off, decided (audit P8) — no change.** The toggle (hold the damage
+  seal's Judgement until <0.4s before the next white swing, so the swing never lands
+  seal-less) is explicitly experimental and latency-sensitive - built as a trial with no
+  guarantee it actually lands correctly on a given connection, so it stays opt-in rather than
+  a safe default.
 
 ### Holy (raid/dungeon heal) `[T]` — melee-capable healer
 At range: Flash of Light spam (tank), Holy Light (big heals), Holy Shock (instant,
@@ -71,12 +87,49 @@ capstone: crit-heal leaves a 12s +20% healing-taken / +5% max-HP buff. Manage Ha
 
 ### Protection (tank/dungeon) `[T]`
 Blessing of Sanctuary → Holy Strike (free, mana return) → judge Seal of Wisdom, reseal →
-high-rank Consecration → Holy Shield on Redoubt proc → Bulwark of the Righteous (row-7
-capstone: Holy damage + 40% DR, 3-min CD).
+high-rank Consecration → Holy Shield kept up on cooldown. **Bulwark of the Righteous is
+deliberately NOT part of the automated loop** (see note below).
+- **Consecration as a single-target filler, decided (audit P4) — no code change.** Stays
+  AoE-only, manual toggle. A tank wants it held in reserve for adds appearing suddenly
+  rather than burning it as steady single-target chip damage; the damage-to-mana ratio
+  against one target doesn't justify auto-casting it there anyway.
+- **Holy Shield trigger, resolved (audit P5) — no code change.** The "Holy Shield on Redoubt
+  proc" phrasing above is corrected: in-game tooltips (135 mana, instant, 10s cooldown,
+  +45% block chance **for 10 sec** - Redoubt is a separate, independent 5-rank passive with
+  its own proc chance) show Holy Shield's own duration exactly matches its cooldown, i.e. it
+  is designed for continuous uptime, not a proc-timed hold. It is also self-sufficient
+  regardless of Redoubt: each block it grants deals 35 Holy damage with **+50% extra
+  threat**, valuable on its own merits. Aegis_SBR's existing behavior (recast on cooldown
+  whenever ready) is correct; this was the audit's highest-risk item and needed real
+  evidence before touching a tank defensive - now settled.
+- **Bulwark of the Righteous, resolved (audit P6) — no code change, deliberately not
+  automated.** In-game tooltip corrects the numbers above: 200 mana, instant, 5yd, **5 min
+  cooldown** (not 3), 274-301 Holy damage, **30% damage reduction for 12 sec** (not 40%).
+  Requires 31 Protection points (a true row-7/8 capstone, comparable depth to Noxious
+  Assault's 31 Assassination points). Decided to leave it out of the automated rotation
+  entirely: a 5-minute emergency defensive is meant for situational manual use during a
+  spike of incoming damage, a judgment call the player should make, not the rotation - the
+  same reasoning that already keeps Divine Shield/Lay on Hands/Hand of Protection manual-only
+  below.
+- **Prot seal-of-choice template default, decided (audit P7) — no template change.** Seal of
+  Wisdom (the research's suggested "core loop" seal, for group-wide mana return) isn't even
+  available before level 18, so defaulting a fresh `prot` profile to it would leave a
+  leveling tank with no seal at all until they manually switch - the current Seal of the
+  Crusader/Righteousness default works immediately at any level. On top of that, with
+  multiple paladins in a group, Seal of Wisdom coverage needs coordinating (a second paladin
+  typically runs Seal of Judgement instead of doubling up), so there is no single "correct"
+  default anyway - this is left as the already-supported manual/situational choice it is.
 
 ### Leveling `[T]`
-Seal of Command R1 + Holy Strike (free) + Judgement between autos; finish with Judgement of
-Command. Proc weapons prized.
+Seal of Command R1 + Judgement between autos; finish with Judgement of Command. Proc weapons
+prized.
+- **Pre-talent strike lean, resolved (audit P11) — no code change.** The "Holy Strike (free)"
+  leveling lean above is corrected: Zeal (via Crusader Strike) works from level 1 with zero
+  talent investment, while Holy Might (via Holy Strike) does not exist as a buff until the
+  Vengeful Strikes talent is taken - there is nothing to gain by leaning on Holy Strike before
+  that talent, since its payoff buff isn't there yet. Aegis_SBR's existing behavior (lean
+  Crusader Strike pre-talent, only start tracking Holy Might once the talent is confirmed
+  known) is correct as-is.
 
 ### PvP/defensive (Phase 4, note only)
 Divine Shield, Lay on Hands, Hand of Protection/Freedom, Repentance.
