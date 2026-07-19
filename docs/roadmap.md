@@ -159,7 +159,16 @@ from the polish backlog if built.
   (Paladin/Priest/Druid/Shaman) into one shared module; class modules pass config in.
 - **Weapon-enchant awareness / poison + imbue upkeep** (Rogue + Shaman; per-class UI toggle):
   detect and optionally maintain weapon imbues (Shaman) and poisons (Rogue). **Full feasibility
-  study in `docs/research-weapon-enchant-upkeep.md` — read it first.** Key findings:
+  study in `docs/research-weapon-enchant-upkeep.md` — read it first.**
+  > **STATUS: first cut SHIPPED in v0.15.0** — shared detection helper
+  > (`Aegis_SBR:WeaponEnchant`/`WeaponEnchantId`), Shaman main-hand imbue upkeep
+  > (out-of-combat auto-apply + in-combat opt-in, default OFF), Rogue poison pre-pull
+  > reminder (warn-only). **Still open:** off-hand imbue; Rogue poison auto-apply (needs the
+  > replace-popup + in-combat-application dummy tests, items 3 & 4 in the research doc); and
+  > topping-up an imbue that's present-but-low via overwrite (blocked on the popup test —
+  > currently warn-only).
+
+  Key findings:
   - **Primary API is `GetWeaponEnchantInfo()`** (returns `has*`, **`*Expiration` in ms**,
     charges, id) — better than the 2.1 `GetWeaponEnchantID` (wiki-confirmed 2026-07-17)
     because it gives *time remaining*. `GetWeaponEnchantID(unit)` is an optional identity
