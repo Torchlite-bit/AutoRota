@@ -13,7 +13,7 @@ Aegis_SBR_Minimap = {}
 local AM = Aegis_SBR_Minimap
 
 local DEFAULT_ANGLE = 200   -- degrees around the minimap, lower-left by default
-local RADIUS = 80           -- distance from the minimap centre to the button
+local RADIUS = 80           -- fallback distance from centre if the minimap size is unreadable
 
 -- The built-in class crest sheet (4x4 grid, 0.25 steps). We pick the cell
 -- matching the player's class so the button wears their class icon, and fall
@@ -35,10 +35,22 @@ local CLASS_TCOORDS = {
 -- ------------------------------------------------------------
 -- placement, dragging, and the class icon
 -- ------------------------------------------------------------
+-- Distance from the minimap centre, derived from the minimap's ACTUAL size so
+-- the button hugs the edge of whatever minimap is present. A fixed radius floats
+-- the button out past the edge when another addon resizes the minimap - pfUI in
+-- particular shrinks it, and the button then lands over pfUI's border frame
+-- where only a sliver stays clickable. Falls back to RADIUS if the size reads 0.
+local function minimapRadius()
+    local w = (Minimap and Minimap.GetWidth and Minimap:GetWidth()) or 0
+    if w > 4 then return w / 2 + 5 end
+    return RADIUS
+end
+
 local function placeButton()
     local angle = math.rad((AegisDB and AegisDB.minimapAngle) or DEFAULT_ANGLE)
+    local r = minimapRadius()
     AM.button:ClearAllPoints()
-    AM.button:SetPoint("CENTER", Minimap, "CENTER", RADIUS * math.cos(angle), RADIUS * math.sin(angle))
+    AM.button:SetPoint("CENTER", Minimap, "CENTER", r * math.cos(angle), r * math.sin(angle))
 end
 
 local function dragUpdate()
@@ -308,7 +320,10 @@ local function buildButton()
     local b = CreateFrame("Button", "Aegis_SBR_MinimapButton", Minimap)
     b:SetWidth(31); b:SetHeight(31)
     b:SetFrameStrata("MEDIUM")
-    b:SetFrameLevel(8)
+    -- Sit clearly above the minimap and any frames another addon layers over it
+    -- (pfUI's minimap border/buttons), so clicks land on the whole button rather
+    -- than being intercepted except for a sliver at the edge.
+    b:SetFrameLevel((Minimap:GetFrameLevel() or 4) + 10)
     b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     b:RegisterForDrag("LeftButton")
     b:SetMovable(true)
