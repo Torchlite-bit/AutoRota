@@ -213,6 +213,11 @@ function M:NormalizeProfile(c)
     if c.mode ~= "ranged" and c.mode ~= "melee" and c.mode ~= "auto" then c.mode = "ranged" end
     if type(c.sting) ~= "string" then c.sting = "Serpent Sting" end
     if type(c.rangedAspect) ~= "string" then c.rangedAspect = "Aspect of the Hawk" end
+    -- Two-threshold mana-aspect swap: drop to the mana aspect below manaAspectPct,
+    -- swap back to the combat aspect at manaAspectBackPct. Older profiles used a
+    -- fixed +MANA_ASPECT_HYST hysteresis, so default the back mark to that to
+    -- preserve their existing behavior exactly.
+    if c.manaAspectBackPct == nil then c.manaAspectBackPct = (c.manaAspectPct or 30) + MANA_ASPECT_HYST end
     -- migrate the old ranged-only schema (useArcaneShot etc. carried over)
     return c
 end
@@ -501,14 +506,18 @@ function M:PetCleave()
     self.petCleaveT = now
 end
 
--- Mana aspect hysteresis: drop to the mana aspect below the low mark, swap
--- back to the combat aspect once mana climbs a buffer above it.
+-- Mana aspect hysteresis: drop to the mana aspect below the low mark
+-- (manaAspectPct), swap back to the combat aspect at the high mark
+-- (manaAspectBackPct). Both are user-set sliders; the back mark is guarded to
+-- always sit above the low mark so the two edges never collapse into a flap.
 function M:UpdateAspectState(cfg)
     if cfg.useManaAspect and self:KnownManaAspect() then
         local mp = self:ManaPct()
         local low = cfg.manaAspectPct or 30
+        local back = cfg.manaAspectBackPct or (low + MANA_ASPECT_HYST)
+        if back <= low then back = low + 1 end
         if mp < low then self.manaAspectActive = true end
-        if mp >= (low + MANA_ASPECT_HYST) then self.manaAspectActive = false end
+        if mp >= back then self.manaAspectActive = false end
     else
         self.manaAspectActive = false
     end
