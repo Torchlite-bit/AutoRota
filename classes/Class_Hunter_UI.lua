@@ -48,8 +48,10 @@ function M:BuildBody(ui, parent)
 
     L:Header("Aspect")
     self.aspectRow = L:Row{ key = "useAspect", label = "Combat aspect", sub = "Hawk/Wolf", onToggle = set("useAspect") }
-    self.manaAspRow = L:Row{ key = "useManaAspect", label = "Mana aspect when low", onToggle = set("useManaAspect"),
+    self.manaAspRow = L:Row{ key = "useManaAspect", label = "Viper below", onToggle = set("useManaAspect"),
         slider = { key = "manaAspectPct", min = 0, max = 90, step = 5, suffix = "%", onChange = set("manaAspectPct") } }
+    self.manaBackRow = L:Row{ label = "Back to combat at",
+        slider = { key = "manaAspectBackPct", min = 5, max = 100, step = 5, suffix = "%", onChange = set("manaAspectBackPct") } }
 
     L:Header("Pet")
     self.petRow = L:Row{ key = "petAttack", label = "Send pet to attack", onToggle = set("petAttack") }
@@ -82,8 +84,9 @@ function M:BuildBody(ui, parent)
     ui:Tip(self.lacerateRow.cb, "Lacerate", "Melee bleed, kept rolling on the target in melee mode.")
     ui:Tip(self.carveRow.cb, "Carve", "Melee AoE strike. Leads the melee priority when AoE mode is on (/sbr aoe).")
     ui:Tip(self.aspectRow.cb, "Combat aspect", "Keeps Aspect of the Hawk up in ranged mode, Aspect of the Wolf in melee mode.")
-    ui:Tip(self.manaAspRow.cb, "Mana aspect swap", "Swap to the mana-regenerating aspect below the slider value, then back to your combat aspect once mana recovers.")
-    ui:Tip(self.manaAspRow.slider, "Swap below", "Mana percent under which the mana aspect is used.")
+    ui:Tip(self.manaAspRow.cb, "Mana aspect swap", "Swap to Aspect of the Viper when mana drops below the first value, then back to your combat aspect (Hawk ranged / Wolf melee) once mana recovers to the second value.")
+    ui:Tip(self.manaAspRow.slider, "Viper below", "Drop to Aspect of the Viper when your mana falls under this percent.")
+    ui:Tip(self.manaBackRow.slider, "Back to combat at", "Swap back to Aspect of the Hawk/Wolf once mana recovers to this percent. Set it above the 'Viper below' value.")
     ui:Tip(self.petRow.cb, "Pet attack", "Sends your pet onto the target each press.")
     ui:Tip(self.mendRow.cb, "Mend Pet", "Heals the pet below the slider value (HoT, refreshed ~12s).")
     ui:Tip(self.mendRow.slider, "Mend Pet below", "Pet health percent under which Mend Pet is cast.")
@@ -139,11 +142,16 @@ function M:RefreshBody(ui, buf)
     end
     ui:BindCheck(self.aimedOpenerRow, buf.useAimedOpener)
 
-    -- mana aspect slider follows the swap checkbox
+    -- mana aspect sliders follow the swap checkbox: swap-to-Viper (low) and
+    -- swap-back-to-combat (high).
     local map = buf.manaAspectPct or 30
     self.manaAspRow.slider:SetValue(map)
     if self.manaAspRow.slider.valText then self.manaAspRow.slider.valText:SetText(map .. "%") end
     ui:SliderEnable(self.manaAspRow.slider, buf.useManaAspect and true or false)
+    local mback = buf.manaAspectBackPct or (map + 15)
+    self.manaBackRow.slider:SetValue(mback)
+    if self.manaBackRow.slider.valText then self.manaBackRow.slider.valText:SetText(mback .. "%") end
+    ui:SliderEnable(self.manaBackRow.slider, buf.useManaAspect and true or false)
 
     -- Mend Pet threshold slider follows the Mend Pet checkbox.
     local mhp = buf.mendPetHp or 50
