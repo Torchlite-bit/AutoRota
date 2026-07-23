@@ -609,15 +609,13 @@ end
 -- ============================================================
 
 -- Record an in-flight heal so the next press does not pile onto the same unit.
--- Also stamps their real HP at commit time (see PendingFor) and our own
--- expected cast completion (see StillCasting) - Holy Light's 2.5s cast is
--- longer than the 1.5s global cooldown, so GcdReady() alone reports "ready"
--- up to a full second before the cast actually finishes.
+-- Also stamps our own expected cast completion (see StillCasting) - Holy
+-- Light's 2.5s cast is longer than the 1.5s global cooldown, so GcdReady()
+-- alone reports "ready" up to a full second before the cast actually finishes.
 function M:CommitHeal(unit, amount, castTime)
     self.healTarget = UnitName(unit)
     self.healAmount = amount or 0
     self.healUntil = GetTime() + (castTime or 0) + 1.0
-    self.healBaseline = UnitHealth(unit)
     self.castingUntil = GetTime() + (castTime or 0)
 end
 
@@ -626,21 +624,39 @@ end
 -- whose cast time exceeds the GCD (Holy Light at 2.5s), where a spammed
 -- press could otherwise start a second heal before the first has landed,
 -- since the target's HP (and PendingFor's prediction) hasn't updated yet.
+-- Checks the client's OWN cast-bar state first (CastingBarFrame.casting),
+-- which reflects the real, server-confirmed cast regardless of exactly when
+-- Nampower's queue actually started it - Nampower queues a press that lands
+-- during an active cast/GCD and fires it the instant that cast completes, a
+-- behavior that applies to plain CastSpellByName too, not just calls that
+-- explicitly use QueueSpellByName (see docs/dependencies.md). A castTime-based
+-- guess (castingUntil) assumes the cast started the instant CastSpellByName
+-- was called, which is not guaranteed once Nampower's queue is involved -
+-- the real cast bar sidesteps that assumption entirely. castingUntil stays
+-- as a fallback for the rare case CastingBarFrame is unavailable.
 function M:StillCasting()
+    if CastingBarFrame and (CastingBarFrame.casting or CastingBarFrame.channeling) then
+        return true
+    end
     return self.castingUntil and GetTime() < self.castingUntil
 end
 
--- Predicted incoming heal for a unit from our own pending cast, else 0. Only
--- trusted while their REAL health hasn't dropped below what it was at commit
--- time - otherwise new damage landed after the heal was queued, and letting
--- the stale prediction pad WorstHurt's health estimate back up would mask a
--- fresh crisis for the rest of the cast (up to ~castTime + 1s) instead of
--- reacting to it immediately.
+-- Predicted incoming heal for a unit from our own pending cast, else 0. The
+-- caller (WorstHurt) ADDS this to the unit's real current HP and clamps to
+-- max, so the prediction can never over-claim: it self-corrects for new
+-- damage. A tank that keeps taking hits while the heal is in flight simply
+-- has a lower real HP, and real + pending lands wherever it actually will;
+-- only a hit big enough that even the incoming heal won't cover it leaves the
+-- unit below the threshold and eligible for another heal. This is why there
+-- is no "discard if HP dropped below commit-time baseline" guard here - that
+-- guard re-healed any actively-tanked target during the post-cast latency
+-- window (real HP already below commit time, but the landed heal's HP update
+-- not yet arrived from the server), causing the exact overheal it was meant
+-- to avoid. The window is bounded by healUntil (castTime + 1s of latency
+-- slack) so a resisted/failed cast self-corrects quickly.
 function M:PendingFor(unit)
     if self.healTarget and GetTime() < self.healUntil and UnitName(unit) == self.healTarget then
-        if UnitHealth(unit) >= (self.healBaseline or 0) then
-            return self.healAmount
-        end
+        return self.healAmount
     end
     return 0
 end

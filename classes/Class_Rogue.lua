@@ -43,16 +43,19 @@ M.templates = {
     starter = {  -- valid for any rogue, only Slice and Dice upkeep
         builder = "", useSnd = true, useEnvenom = false, useRupture = false, useRiposte = false,
         useSurpriseAttack = false,
+        useExecute = false, executeHpPct = 10,
         cpFinish = 4, popCDs = false, autoCDElite = false,
     },
     assassination = {
         builder = "", useSnd = true, useEnvenom = true, useRupture = true, useRiposte = true,
         useSurpriseAttack = false,
+        useExecute = false, executeHpPct = 10,
         cpFinish = 4, popCDs = false, autoCDElite = false,
     },
     combat = {
         builder = "", useSnd = true, useEnvenom = false, useRupture = false, useRiposte = false,
         useSurpriseAttack = true,
+        useExecute = false, executeHpPct = 10,
         cpFinish = 5, popCDs = false, autoCDElite = true,
     },
 }
@@ -74,14 +77,17 @@ function M:NormalizeProfile(c)
     if c.useRupture == nil then c.useRupture = false end
     if c.useRiposte == nil then c.useRiposte = false end
     if c.useSurpriseAttack == nil then c.useSurpriseAttack = false end
+    -- Execute: finish with whatever combo points are on hand once the target
+    -- is nearly dead, instead of risking them going to waste on a kill.
+    -- Ruthlessness (Assassination talent, 100% at 3/3) guarantees at least 1
+    -- combo point after any finisher, so there is always something to spend.
+    if c.useExecute == nil then c.useExecute = false end
+    if c.executeHpPct == nil then c.executeHpPct = 10 end
     if c.cpFinish == nil then c.cpFinish = 4 end
     if c.popCDs == nil then c.popCDs = false end
     if c.autoCDElite == nil then c.autoCDElite = false end
-    -- Poison reminder: warn (only) when a weapon poison is missing on entering
-    -- combat. Poisons can't be applied in combat, so this is a pre-pull nudge,
-    -- never an auto-apply. Default OFF. See docs/research-weapon-enchant-upkeep.md.
-    if c.poisonReminder == nil then c.poisonReminder = false end
     -- old keys from any earlier format are dropped silently
+    c.poisonReminder = nil   -- retired: superseded by the Aegis_SBR_BuffUp poison Quick Bar / rebuff buttons
     return c
 end
 
@@ -150,6 +156,13 @@ function M:Rotate(cfg)
     local cp = GetComboPoints("player", "target")
     local now = GetTime()
 
+    -- Execute: below a low HP threshold, finish with whatever combo points
+    -- are on hand rather than risk them going to waste if the target dies
+    -- before reaching the normal cpFinish. Requires at least 1 combo point
+    -- (Ruthlessness, 100% at 3/3, guarantees one is on hand after any
+    -- finisher, so this is rarely blocked once a fight is underway).
+    local execute = cfg.useExecute and cp >= 1 and self:TargetHPPct() <= (cfg.executeHpPct or 10)
+
     if self.trace then
         self:Trace("cp=" .. cp
             .. " build=" .. builder
@@ -158,6 +171,7 @@ function M:Rotate(cfg)
             .. " rup=" .. (useRup and (self:TargetDebuffUp("Rupture", "Ability_Rogue_Rupture") and "up" or "down") or "-")
             .. " rip=" .. ((cfg.useRiposte and now < (self.riposteExpiry or 0)) and "Y" or "N")
             .. " sa=" .. ((cfg.useSurpriseAttack and now < (self.surpriseExpiry or 0)) and "Y" or "N")
+            .. " exec=" .. (cfg.useExecute and (execute and "Y" or "N") or "-")
             .. " elite=" .. (isElite and "Y" or "N"),
             -- Rogue never downranks (all ranks cost the same energy), so every
             -- Cast() below is a bare CastSpellByName(name) - vanilla resolves
@@ -237,8 +251,8 @@ function M:Rotate(cfg)
         if self:Cast("Rupture") then return end
     end
 
-    -- P6 buffs healthy, enough combo points, Eviscerate
-    if cp >= cpEvis then
+    -- P6 buffs healthy, enough combo points (or target about to die), Eviscerate
+    if cp >= cpEvis or execute then
         self:Cast("Eviscerate")
         return
     end
@@ -266,43 +280,18 @@ function M:HandleCommand(cmd, t)
 end
 
 -- ============================================================
--- Poison reminder (warn only). Poisons are item-applied and cannot be put on
--- in combat, so the honest feature is a pre-pull nudge: on entering combat,
--- if the active profile opts in and a weapon poison is missing, print a
--- warning. Detection via the core WeaponEnchant helper (GetWeaponEnchantInfo);
--- the off-hand is only nagged about when an off-hand weapon is actually
--- equipped. No auto-apply. See docs/research-weapon-enchant-upkeep.md.
--- ============================================================
-function M:PoisonCheck()
-    local cfg = Aegis_SBR:GetActiveProfile()
-    if not cfg or not cfg.poisonReminder then return end
-    if not GetWeaponEnchantInfo then return end   -- no detection API: degrade
-    local missing = {}
-    if not Aegis_SBR:WeaponEnchant("main") then table.insert(missing, "main-hand") end
-    if not Aegis_SBR:WeaponEnchant("off")
-        and GetInventoryItemLink and GetInventoryItemLink("player", 17) then
-        table.insert(missing, "off-hand")
-    end
-    if table.getn(missing) > 0 then
-        Aegis_SBR:Msg("poison missing on your " .. table.concat(missing, " and ")
-            .. " - apply before pulling.", 1, 0.5, 0.3)
-    end
-end
-
--- ============================================================
--- Parry window tracker for Riposte + the poison reminder on combat enter.
--- Owned by the module, stays inert while both options are off.
+-- Parry window tracker for Riposte. Owned by the module, stays inert while
+-- Riposte is not learned or the option is off. (The old pre-pull poison
+-- reminder was retired: the poison Quick Bar / rebuff buttons in
+-- Aegis_SBR_BuffUp already surface a missing poison on screen.)
 -- ============================================================
 local riposteFrame = CreateFrame("Frame")
 riposteFrame:RegisterEvent("CHAT_MSG_COMBAT_CREATURE_VS_SELF_MISSES")
-riposteFrame:RegisterEvent("PLAYER_REGEN_DISABLED")   -- entered combat (the pull)
 riposteFrame:SetScript("OnEvent", function()
     if event == "CHAT_MSG_COMBAT_CREATURE_VS_SELF_MISSES" then
         if arg1 and string.find(string.lower(arg1), "parry") then
             M.riposteExpiry = GetTime() + 5.5
         end
-    elseif event == "PLAYER_REGEN_DISABLED" then
-        M:PoisonCheck()
     end
 end)
 
