@@ -4,6 +4,18 @@ All notable changes to **Aegis: Single Button Rotation** (formerly **AutoRota**)
 
 ---
 
+## v0.15.2 — Minimap button click fix, take 2 (strata, for pfUI)
+
+**Fix.** Follow-up to the 0.15.1 minimap fix, which wasn't enough. pfUI layers its minimap
+border / click-catcher on a **higher frame strata** than the minimap, and the 0.15.1 change
+only raised the button's frame *level* — which orders frames within the same strata, so
+pfUI's overlay still intercepted the clicks. The button is now on a higher strata than that
+overlay, so the whole button is clickable (the adaptive edge-hugging radius from 0.15.1 is
+kept). If it's still finicky under a specific pfUI config, that points to click-vs-drag or
+button collection rather than layering — report back and it can be tuned further.
+
+---
+
 ## v0.15.1 — Hunter dual mana-aspect thresholds + minimap button clickable under pfUI
 
 **Tuning + fix.**
